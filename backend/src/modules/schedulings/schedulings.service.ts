@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Availability, Client, Professional, Scheduling } from '../../database/entities';
 import { DayOfWeek, SchedulingStatus } from '../../common/enums';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
+import { ListSchedulingsQueryDto } from './dto/list-schedulings-query.dto';
 import { TimeSlot } from './dto/time-slot.dto';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
 
@@ -105,6 +106,41 @@ export class SchedulingsService {
 
     this.logger.log(`Agendamento criado: ${created.id}`);
     return created;
+  }
+
+  async findAll(query: ListSchedulingsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 30, 100);
+    const qb = this.schedulingRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.client', 'client')
+      .leftJoinAndSelect('client.user', 'clientUser')
+      .leftJoinAndSelect('s.professional', 'professional')
+      .leftJoinAndSelect('professional.user', 'professionalUser')
+      .orderBy('s.startAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (query.status) qb.andWhere('s.status = :status', { status: query.status });
+    if (query.clientId) qb.andWhere('client.id = :clientId', { clientId: query.clientId });
+    if (query.professionalId) {
+      qb.andWhere('professional.id = :professionalId', { professionalId: query.professionalId });
+    }
+    if (query.startDate) qb.andWhere('s.startAt >= :startDate', { startDate: query.startDate });
+    if (query.endDate) qb.andWhere('s.endAt <= :endDate', { endDate: query.endDate });
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, meta: { page, limit, total } };
+  }
+
+  async findOne(id: string): Promise<Scheduling> {
+    const scheduling = await this.schedulingRepo.findOne({
+      where: { id },
+      relations: { client: { user: true }, professional: { user: true } },
+    });
+
+    if (!scheduling) throw new NotFoundException('Agendamento não encontrado.');
+    return scheduling;
   }
 
   async cancel(id: string, reason: string): Promise<Scheduling> {

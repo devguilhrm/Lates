@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { SchedulingsService } from './schedulings.service';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
 import { CancelSchedulingDto } from './dto/cancel-scheduling.dto';
+import { ListSchedulingsQueryDto } from './dto/list-schedulings-query.dto';
 
 @Controller('schedulings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +17,18 @@ export class SchedulingsController {
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
   create(@Body() dto: CreateSchedulingDto) {
     return this.schedulingsService.create(dto);
+  }
+
+  @Get()
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
+  findAll(@Query() query: ListSchedulingsQueryDto) {
+    return this.schedulingsService.findAll(query);
+  }
+
+  @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL, UserRole.CLIENT)
+  findOne(@Param('id') id: string) {
+    return this.schedulingsService.findOne(id);
   }
 
   @Patch(':id/cancel')

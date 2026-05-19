@@ -1,37 +1,136 @@
-:root {
-  font-family: 'Segoe UI', sans-serif;
+:host {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr);
+  color: var(--text);
 }
 
-body {
-  margin: 0;
-  background: #f6f8fb;
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 1.2rem;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.65rem;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand small,
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+nav {
+  display: grid;
+  gap: 0.35rem;
+}
+
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.78rem 0.9rem;
+  border-radius: 0.5rem;
+  font-weight: 700;
+}
+
+nav a.active,
+nav a:hover {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.workspace {
+  min-width: 0;
+  background: var(--background);
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background: #0f766e;
-  color: #fff;
-}
-
-.topbar nav {
-  display: flex;
   gap: 1rem;
+  align-items: center;
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+  backdrop-filter: blur(18px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
-.topbar a {
-  color: #ccfbf1;
-  text-decoration: none;
-  font-weight: 500;
+h1 {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
 }
 
-.topbar a.active {
-  color: #fff;
-  border-bottom: 2px solid #fff;
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
 }
 
-.container {
-  padding: 1.5rem 2rem;
+.icon-button,
+.ghost-button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  min-height: 2.35rem;
+  border-radius: 0.5rem;
+  padding: 0 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.icon-button {
+  width: 2.35rem;
+  padding: 0;
+}
+
+.content {
+  padding: 1.5rem;
+}
+
+@media (max-width: 860px) {
+  :host {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

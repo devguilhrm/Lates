@@ -6,21 +6,21 @@ import { Scheduling } from './scheduling.entity';
 @Entity('professionals')
 export class Professional {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @OneToOne(() => User)
   @JoinColumn()
-  user: User;
+  user!: User;
 
   @Column({ length: 80 })
-  specialty: string;
+  specialty!: string;
 
   @Column({ nullable: true })
-  bio: string;
+  bio?: string | null;
 
   @OneToMany(() => Availability, (a) => a.professional)
-  availabilities: Availability[];
+  availabilities!: Availability[];
 
   @OneToMany(() => Scheduling, (s) => s.professional)
-  schedulings: Scheduling[];
+  schedulings!: Scheduling[];
 }

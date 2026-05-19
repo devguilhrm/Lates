@@ -4,38 +4,38 @@ import { UserRole } from '../../common/enums';
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ length: 120 })
-  name: string;
+  name!: string;
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column()
-  passwordHash: string;
+  passwordHash!: string;
 
   @Column({ nullable: true })
-  refreshTokenHash: string | null;
+  refreshTokenHash?: string | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.CLIENT })
-  role: UserRole;
+  role!: UserRole;
 
   @Column({ nullable: true })
-  phone: string;
+  phone?: string | null;
 
   @Column({ nullable: true })
-  avatarUrl: string;
+  avatarUrl?: string | null;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @DeleteDateColumn()
-  deletedAt: Date;
+  deletedAt?: Date | null;
 }

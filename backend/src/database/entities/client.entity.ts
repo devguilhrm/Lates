@@ -6,27 +6,27 @@ import { Scheduling } from './scheduling.entity';
 @Entity('clients')
 export class Client {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @OneToOne(() => User)
   @JoinColumn()
-  user: User;
+  user!: User;
 
   @Column({ type: 'date', nullable: true })
-  birthDate: Date;
+  birthDate?: Date | null;
 
   @Column({ type: 'text', nullable: true })
-  anamnesis: string;
+  anamnesis?: string | null;
 
   @Column({ nullable: true })
-  emergencyContact: string;
+  emergencyContact?: string | null;
 
   @Column({ type: 'enum', enum: PlanType })
-  plan: PlanType;
+  plan!: PlanType;
 
   @Column({ default: 0 })
-  creditsRemaining: number;
+  creditsRemaining!: number;
 
   @OneToMany(() => Scheduling, (s) => s.client)
-  schedulings: Scheduling[];
+  schedulings!: Scheduling[];
 }

@@ -5,20 +5,20 @@ import { Professional } from './professional.entity';
 @Entity('availabilities')
 export class Availability {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => Professional, (professional) => professional.availabilities, { onDelete: 'CASCADE' })
-  professional: Professional;
+  professional!: Professional;
 
   @Column({ type: 'enum', enum: DayOfWeek })
-  dayOfWeek: DayOfWeek;
+  dayOfWeek!: DayOfWeek;
 
   @Column({ type: 'time' })
-  startTime: string;
+  startTime!: string;
 
   @Column({ type: 'time' })
-  endTime: string;
+  endTime!: string;
 
   @Column({ default: 1 })
-  maxConcurrentClients: number;
+  maxConcurrentClients!: number;
 }

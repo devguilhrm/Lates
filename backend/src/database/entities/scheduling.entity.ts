@@ -6,32 +6,32 @@ import { Professional } from './professional.entity';
 @Entity('schedulings')
 export class Scheduling {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => Client, (client) => client.schedulings, { eager: true })
-  client: Client;
+  client!: Client;
 
   @ManyToOne(() => Professional, (professional) => professional.schedulings, { eager: true })
-  professional: Professional;
+  professional!: Professional;
 
   @Column({ type: 'timestamptz' })
-  startAt: Date;
+  startAt!: Date;
 
   @Column({ type: 'timestamptz' })
-  endAt: Date;
+  endAt!: Date;
 
   @Column({ type: 'enum', enum: SchedulingStatus, default: SchedulingStatus.SCHEDULED })
-  status: SchedulingStatus;
+  status!: SchedulingStatus;
 
   @Column({ nullable: true })
-  notes: string;
+  notes?: string | null;
 
   @Column({ nullable: true })
-  cancellationReason: string;
+  cancellationReason?: string | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

@@ -1,4 +1,4 @@
-import {
+Ôªøimport {
   BadRequestException,
   Injectable,
   Logger,
@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Availability, Client, Professional, Scheduling } from '../../database/entities';
 import { DayOfWeek, SchedulingStatus } from '../../common/enums';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
 import { TimeSlot } from './dto/time-slot.dto';
+import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
 
 @Injectable()
 export class SchedulingsService {
@@ -25,7 +25,7 @@ export class SchedulingsService {
     private readonly professionalRepo: Repository<Professional>,
     @InjectRepository(Availability)
     private readonly availabilityRepo: Repository<Availability>,
-    private readonly amqpConnection: AmqpConnection,
+    private readonly schedulingEventsPublisher: SchedulingEventsPublisher,
   ) {}
 
   async checkProfessionalAvailability(
@@ -63,7 +63,7 @@ export class SchedulingsService {
     const endAt = new Date(dto.endAt);
 
     if (endAt <= startAt) {
-      throw new BadRequestException('Hor·rio final deve ser maior que o hor·rio inicial.');
+      throw new BadRequestException('Hor√°rio final deve ser maior que o hor√°rio inicial.');
     }
 
     const [client, professional] = await Promise.all([
@@ -71,8 +71,8 @@ export class SchedulingsService {
       this.professionalRepo.findOne({ where: { id: dto.professionalId }, relations: { user: true } }),
     ]);
 
-    if (!client) throw new NotFoundException('Cliente n„o encontrado.');
-    if (!professional) throw new NotFoundException('Profissional n„o encontrado.');
+    if (!client) throw new NotFoundException('Cliente n√£o encontrado.');
+    if (!professional) throw new NotFoundException('Profissional n√£o encontrado.');
 
     const [professionalAvailable, clientConflict] = await Promise.all([
       this.checkProfessionalAvailability(dto.professionalId, startAt, endAt),
@@ -80,10 +80,10 @@ export class SchedulingsService {
     ]);
 
     if (!professionalAvailable) {
-      throw new BadRequestException('Profissional indisponÌvel no hor·rio informado.');
+      throw new BadRequestException('Profissional indispon√≠vel no hor√°rio informado.');
     }
     if (clientConflict) {
-      throw new BadRequestException('Cliente j· possui agendamento neste hor·rio.');
+      throw new BadRequestException('Cliente j√° possui agendamento neste hor√°rio.');
     }
 
     const scheduling = this.schedulingRepo.create({
@@ -96,7 +96,7 @@ export class SchedulingsService {
     });
 
     const created = await this.schedulingRepo.save(scheduling);
-    await this.amqpConnection.publish('pilates.events', 'scheduling.created', {
+    await this.schedulingEventsPublisher.publishCreated({
       schedulingId: created.id,
       clientEmail: client.user.email,
       professionalName: professional.user.name,
@@ -113,7 +113,7 @@ export class SchedulingsService {
       relations: { client: { user: true } },
     });
 
-    if (!scheduling) throw new NotFoundException('Agendamento n„o encontrado.');
+    if (!scheduling) throw new NotFoundException('Agendamento n√£o encontrado.');
     if (scheduling.status !== SchedulingStatus.SCHEDULED) {
       throw new BadRequestException('Apenas agendamentos com status SCHEDULED podem ser cancelados.');
     }
@@ -122,7 +122,7 @@ export class SchedulingsService {
     scheduling.cancellationReason = reason;
     const updated = await this.schedulingRepo.save(scheduling);
 
-    await this.amqpConnection.publish('pilates.events', 'scheduling.cancelled', {
+    await this.schedulingEventsPublisher.publishCancelled({
       schedulingId: updated.id,
       clientEmail: updated.client.user.email,
       reason,
@@ -134,9 +134,9 @@ export class SchedulingsService {
 
   async complete(id: string): Promise<Scheduling> {
     const scheduling = await this.schedulingRepo.findOne({ where: { id } });
-    if (!scheduling) throw new NotFoundException('Agendamento n„o encontrado.');
+    if (!scheduling) throw new NotFoundException('Agendamento n√£o encontrado.');
     if (scheduling.status !== SchedulingStatus.SCHEDULED) {
-      throw new BadRequestException('Apenas agendamentos com status SCHEDULED podem ser concluÌdos.');
+      throw new BadRequestException('Apenas agendamentos com status SCHEDULED podem ser conclu√≠dos.');
     }
 
     scheduling.status = SchedulingStatus.COMPLETED;
@@ -196,3 +196,4 @@ export class SchedulingsService {
     return slots;
   }
 }
+

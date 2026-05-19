@@ -21,6 +21,22 @@ services:
       RABBITMQ_DEFAULT_USER: pilates
       RABBITMQ_DEFAULT_PASS: pilates123
 
+  kafka:
+    image: bitnami/kafka:3.7
+    ports:
+      - '9094:9094'
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      ALLOW_PLAINTEXT_LISTENER: 'yes'
+
   api:
     build: ./backend
     ports:
@@ -28,6 +44,9 @@ services:
     environment:
       DATABASE_URL: postgres://pilates:pilates123@postgres:5432/pilates_db
       RABBITMQ_URL: amqp://pilates:pilates123@rabbitmq:5672
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: pilatesos-api
+      KAFKA_NOTIFICATIONS_GROUP_ID: pilatesos-notifications
       JWT_SECRET: super-secret-key
       JWT_REFRESH_SECRET: refresh-secret-key
       DB_SYNC: 'true'
@@ -35,6 +54,7 @@ services:
     depends_on:
       - postgres
       - rabbitmq
+      - kafka
 
   frontend:
     build: ./frontend

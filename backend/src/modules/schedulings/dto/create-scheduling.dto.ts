@@ -2,16 +2,16 @@ import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateSchedulingDto {
   @IsUUID()
-  clientId: string;
+  clientId!: string;
 
   @IsUUID()
-  professionalId: string;
+  professionalId!: string;
 
   @IsDateString()
-  startAt: string;
+  startAt!: string;
 
   @IsDateString()
-  endAt: string;
+  endAt!: string;
 
   @IsOptional()
   @IsString()

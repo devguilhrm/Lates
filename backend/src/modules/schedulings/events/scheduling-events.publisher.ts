@@ -1,5 +1,6 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { KafkaProducerService } from '../../messaging/kafka-producer.service';
 import {
   SCHEDULING_EVENTS_EXCHANGE,
@@ -15,8 +16,10 @@ export class SchedulingEventsPublisher {
   private readonly logger = new Logger(SchedulingEventsPublisher.name);
 
   constructor(
-    private readonly amqpConnection: AmqpConnection,
+    @Optional()
+    private readonly amqpConnection: AmqpConnection | undefined,
     private readonly kafkaProducer: KafkaProducerService,
+    private readonly config: ConfigService,
   ) {}
 
   async publishCreated(payload: SchedulingCreatedEvent): Promise<void> {
@@ -52,8 +55,15 @@ export class SchedulingEventsPublisher {
     key: string,
     payload: TPayload,
   ): Promise<void> {
+    if (this.config.get<string>('QUEUES_ENABLED') === 'false') {
+      this.logger.log(`Filas desabilitadas; evento ignorado: ${rabbitRoutingKey}`);
+      return;
+    }
+
     const [rabbitResult] = await Promise.allSettled([
-      this.amqpConnection.publish(SCHEDULING_EVENTS_EXCHANGE, rabbitRoutingKey, payload),
+      this.amqpConnection
+        ? this.amqpConnection.publish(SCHEDULING_EVENTS_EXCHANGE, rabbitRoutingKey, payload)
+        : Promise.resolve(),
       this.kafkaProducer.emit(kafkaTopic, key, payload),
     ]);
 

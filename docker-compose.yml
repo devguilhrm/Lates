@@ -39,17 +39,22 @@ services:
 
   api:
     build: ./backend
+    command: sh -c "npm run migration:run:prod && node dist/main"
     ports:
       - '3000:3000'
     environment:
       DATABASE_URL: postgres://pilates:pilates123@postgres:5432/pilates_db
       RABBITMQ_URL: amqp://pilates:pilates123@rabbitmq:5672
+      QUEUES_ENABLED: 'true'
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID: pilatesos-api
       KAFKA_NOTIFICATIONS_GROUP_ID: pilatesos-notifications
       JWT_SECRET: super-secret-key
       JWT_REFRESH_SECRET: refresh-secret-key
-      DB_SYNC: 'true'
+      ADMIN_NAME: Administrador
+      ADMIN_EMAIL: admin@pilatesos.com
+      ADMIN_PASSWORD: admin123
+      DB_SYNC: 'false'
       PORT: 3000
     depends_on:
       - postgres

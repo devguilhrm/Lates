@@ -10,6 +10,11 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.config.get<string>('QUEUES_ENABLED') === 'false') {
+      this.logger.log('Kafka producer desabilitado por QUEUES_ENABLED=false.');
+      return;
+    }
+
     const brokers = this.getBrokers();
     if (!brokers.length) {
       this.logger.warn('Kafka desabilitado: KAFKA_BROKERS não configurado.');
@@ -37,6 +42,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async emit<TPayload>(topic: string, key: string, payload: TPayload): Promise<void> {
+    if (this.config.get<string>('QUEUES_ENABLED') === 'false') return;
+
     if (!this.producer) {
       this.logger.warn(`Evento Kafka ignorado sem conexão: ${topic}`);
       return;

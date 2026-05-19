@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
@@ -9,6 +10,22 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AuthModule } from './modules/auth/auth.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
+import { HealthModule } from './modules/health/health.module';
+import { SeedsModule } from './modules/seeds/seeds.module';
+
+const queueImports =
+  process.env.QUEUES_ENABLED === 'false'
+    ? []
+    : [
+        RabbitMQModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            exchanges: [{ name: 'pilates.events', type: 'topic' }],
+            uri: config.get<string>('RABBITMQ_URL'),
+            connectionInitOptions: { wait: false },
+          }),
+        }),
+      ];
 
 @Module({
   imports: [
@@ -24,15 +41,10 @@ import { ProfessionalsModule } from './modules/professionals/professionals.modul
         entities: [User, Client, Professional, Availability, Scheduling],
       }),
     }),
-    RabbitMQModule.forRootAsync({ 
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        exchanges: [{ name: 'pilates.events', type: 'topic' }],
-        uri: config.get<string>('RABBITMQ_URL'),
-        connectionInitOptions: { wait: false },
-      }),
-    }),
+    ...queueImports,
     AuthModule,
+    HealthModule,
+    SeedsModule,
     ClientsModule,
     ProfessionalsModule,
     SchedulingsModule,

@@ -1,28 +1,37 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { UserRole } from '../../common/enums';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { SchedulingsService } from './schedulings.service';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
 import { CancelSchedulingDto } from './dto/cancel-scheduling.dto';
 
 @Controller('schedulings')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SchedulingsController {
   constructor(private readonly schedulingsService: SchedulingsService) {}
 
   @Post()
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
   create(@Body() dto: CreateSchedulingDto) {
     return this.schedulingsService.create(dto);
   }
 
   @Patch(':id/cancel')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
   cancel(@Param('id') id: string, @Body() dto: CancelSchedulingDto) {
     return this.schedulingsService.cancel(id, dto.reason);
   }
 
   @Patch(':id/complete')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
   complete(@Param('id') id: string) {
     return this.schedulingsService.complete(id);
   }
 
   @Get('professionals/:professionalId/slots')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL, UserRole.CLIENT)
   slots(
     @Param('professionalId') professionalId: string,
     @Query('date') date: string,

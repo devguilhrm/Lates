@@ -25,6 +25,11 @@ export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.config.get<string>('QUEUES_ENABLED') === 'false') {
+      this.logger.log('Notification queues desabilitadas por QUEUES_ENABLED=false.');
+      return;
+    }
+
     const brokers = this.getBrokers();
     if (!brokers.length) {
       this.logger.warn('Kafka consumer desabilitado: KAFKA_BROKERS não configurado.');

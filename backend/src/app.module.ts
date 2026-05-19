@@ -7,6 +7,8 @@ import { Availability, Client, Professional, Scheduling, User } from './database
 import { SchedulingsModule } from './modules/schedulings/schedulings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { ProfessionalsModule } from './modules/professionals/professionals.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { AuthModule } from './modules/auth/auth.module';
       }),
     }),
     AuthModule,
+    ClientsModule,
+    ProfessionalsModule,
     SchedulingsModule,
     NotificationsModule,
   ],

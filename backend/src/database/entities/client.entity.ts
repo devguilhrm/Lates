@@ -18,7 +18,7 @@ export class Client {
   @Column({ type: 'text', nullable: true })
   anamnesis?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   emergencyContact?: string | null;
 
   @Column({ type: 'enum', enum: PlanType })

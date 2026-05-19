@@ -15,7 +15,7 @@ export class Professional {
   @Column({ length: 80 })
   specialty!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   bio?: string | null;
 
   @OneToMany(() => Availability, (a) => a.professional)

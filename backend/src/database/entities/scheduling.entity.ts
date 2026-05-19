@@ -23,10 +23,10 @@ export class Scheduling {
   @Column({ type: 'enum', enum: SchedulingStatus, default: SchedulingStatus.SCHEDULED })
   status!: SchedulingStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   notes?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   cancellationReason?: string | null;
 
   @CreateDateColumn()

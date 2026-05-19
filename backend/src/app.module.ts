@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { Availability, Client, Professional, Scheduling, User } from './database/entities';
 import { SchedulingsModule } from './modules/schedulings/schedulings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
         connectionInitOptions: { wait: false },
       }),
     }),
+    AuthModule,
     SchedulingsModule,
     NotificationsModule,
   ],

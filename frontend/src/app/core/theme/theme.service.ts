@@ -4,7 +4,7 @@ export type ThemeMode = 'light' | 'dark';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  readonly mode = signal<ThemeMode>((localStorage.getItem('pilatesos.theme') as ThemeMode) ?? 'dark');
+  readonly mode = signal<ThemeMode>((localStorage.getItem('pilatesos.theme') as ThemeMode) ?? 'light');
 
   constructor() {
     effect(() => {

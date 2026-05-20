@@ -1,7 +1,8 @@
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { SchedulingStatus } from '../../common/enums';
+import { CancellationType, SchedulingStatus } from '../../common/enums';
 import { Client } from './client.entity';
 import { Professional } from './professional.entity';
+import { User } from './user.entity';
 
 @Entity('schedulings')
 export class Scheduling {
@@ -13,6 +14,9 @@ export class Scheduling {
 
   @ManyToOne(() => Professional, (professional) => professional.schedulings, { eager: true })
   professional!: Professional;
+
+  @ManyToOne(() => User, { eager: true, nullable: true, onDelete: 'SET NULL' })
+  createdBy?: User | null;
 
   @Column({ type: 'timestamptz' })
   startAt!: Date;
@@ -28,6 +32,9 @@ export class Scheduling {
 
   @Column({ type: 'varchar', nullable: true })
   cancellationReason?: string | null;
+
+  @Column({ type: 'enum', enum: CancellationType, nullable: true })
+  cancellationType?: CancellationType | null;
 
   @CreateDateColumn()
   createdAt!: Date;

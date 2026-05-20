@@ -1,12 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '../../common/enums';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { SchedulingsService } from './schedulings.service';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
 import { CancelSchedulingDto } from './dto/cancel-scheduling.dto';
 import { ListSchedulingsQueryDto } from './dto/list-schedulings-query.dto';
+import { RescheduleSchedulingDto } from './dto/reschedule-scheduling.dto';
 
 @Controller('schedulings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,8 +18,8 @@ export class SchedulingsController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
-  create(@Body() dto: CreateSchedulingDto) {
-    return this.schedulingsService.create(dto);
+  create(@Body() dto: CreateSchedulingDto, @CurrentUser() user: JwtPayload) {
+    return this.schedulingsService.create(dto, user.sub);
   }
 
   @Get()
@@ -34,13 +37,22 @@ export class SchedulingsController {
   @Patch(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
   cancel(@Param('id') id: string, @Body() dto: CancelSchedulingDto) {
-    return this.schedulingsService.cancel(id, dto.reason);
+    return this.schedulingsService.cancel(id, dto.type, dto.reason);
   }
 
   @Patch(':id/complete')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
-  complete(@Param('id') id: string) {
+  complete(@Param('id', ParseUUIDPipe) id: string) {
     return this.schedulingsService.complete(id);
+  }
+
+  @Patch(':id/reschedule')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  reschedule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RescheduleSchedulingDto,
+  ) {
+    return this.schedulingsService.reschedule(id, dto);
   }
 
   @Get('professionals/:professionalId/slots')

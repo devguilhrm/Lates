@@ -1,8 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { SchedulingStatus } from '../../../common/enums';
 
 export class ListSchedulingsQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @IsOptional()
   @IsEnum(SchedulingStatus)
   status?: SchedulingStatus;

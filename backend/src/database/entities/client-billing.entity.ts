@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import { SubscriptionBillingCycle, SubscriptionBillingStatus } from '../../common/enums';
 import { Client } from './client.entity';
+import { FinancialTransaction } from './financial-transaction.entity';
 
 @Entity('client_billings')
 @Unique('UQ_client_billings_cycle_period', ['client', 'cycle', 'referencePeriod'])
@@ -28,4 +29,7 @@ export class ClientBilling {
 
   @Column({ type: 'timestamptz', nullable: true })
   paidAt?: Date | null;
+
+  @ManyToOne(() => FinancialTransaction, { nullable: true, onDelete: 'SET NULL' })
+  paymentTransaction?: FinancialTransaction | null;
 }

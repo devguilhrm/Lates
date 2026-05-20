@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { ILike, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums';
 import { Client, Scheduling, User } from '../../database/entities';
+import { SubscriptionBillingService } from '../billing/subscription-billing.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { ListClientsQueryDto } from './dto/list-clients-query.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -24,6 +25,7 @@ export class ClientsService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Scheduling)
     private readonly schedulingsRepo: Repository<Scheduling>,
+    private readonly subscriptionBillingService: SubscriptionBillingService,
   ) {}
 
   async create(dto: CreateClientDto): Promise<Client> {
@@ -53,15 +55,29 @@ export class ClientsService {
   }
 
   async findAll(query: ListClientsQueryDto) {
-    const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
-    const skip = (page - 1) * limit;
-
     const where = {
       ...(query.plan ? { plan: query.plan } : {}),
       ...(query.email ? { user: { email: query.email } } : {}),
       ...(query.search ? { user: { name: ILike(`%${query.search}%`) } } : {}),
     };
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    if (query.onlyNotUpToDate) {
+      const clients = await this.clientsRepo.find({
+        where,
+        relations: { user: true },
+        order: { user: { name: 'ASC' } },
+      });
+      const decorated = await this.decorateWithSubscription(clients);
+      const filtered = decorated.filter((client) => !client.isUpToDate);
+
+      return {
+        items: filtered.slice(skip, skip + limit),
+        meta: { page, limit, total: filtered.length },
+      };
+    }
 
     const [items, total] = await this.clientsRepo.findAndCount({
       where,
@@ -70,8 +86,9 @@ export class ClientsService {
       skip,
       take: limit,
     });
+    const decorated = await this.decorateWithSubscription(items);
 
-    return { items, meta: { page, limit, total } };
+    return { items: decorated, meta: { page, limit, total } };
   }
 
   async findOne(id: string): Promise<Client> {
@@ -82,6 +99,17 @@ export class ClientsService {
 
     if (!client) throw new NotFoundException('Cliente nao encontrado.');
     return client;
+  }
+
+  async findByUserId(userId: string): Promise<Client> {
+    const client = await this.clientsRepo.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!client) throw new NotFoundException('Perfil de cliente nao encontrado.');
+    const [decorated] = await this.decorateWithSubscription([client]);
+    return decorated as Client;
   }
 
   async update(id: string, dto: UpdateClientDto): Promise<Client> {
@@ -138,5 +166,23 @@ export class ClientsService {
 
   private defaultCreditsByPlan(plan: Client['plan']): number {
     return this.planCredits[plan];
+  }
+
+  private async decorateWithSubscription(items: Client[]) {
+    const now = new Date();
+    const snapshots = await Promise.all(
+      items.map((client) => this.subscriptionBillingService.getClientSubscriptionSnapshot(client, now)),
+    );
+
+    return items.map((client, index) => {
+      const subscription = snapshots[index];
+      return {
+        ...client,
+        subscriptionStatus: subscription.status,
+        isUpToDate: subscription.isUpToDate,
+        subscriptionCycle: subscription.cycle,
+        subscriptionDueDate: subscription.billing?.dueDate ?? null,
+      };
+    });
   }
 }

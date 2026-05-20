@@ -27,6 +27,10 @@ export interface Client {
   emergencyContact?: string | null;
   plan: PlanType;
   creditsRemaining: number;
+  subscriptionStatus?: SubscriptionBillingStatus;
+  isUpToDate?: boolean;
+  subscriptionCycle?: SubscriptionBillingCycle;
+  subscriptionDueDate?: string | null;
 }
 
 export interface Professional {
@@ -72,6 +76,7 @@ export interface FinancialTransaction {
   cardBrand?: CardBrand | null;
   installments?: number | null;
   category?: string | null;
+  creditQuantity?: number | null;
   occurredAt: string;
   createdAt: string;
   updatedAt: string;
@@ -105,6 +110,7 @@ export interface SubscriptionBillingItem {
   clientName: string;
   clientEmail: string;
   plan: PlanType;
+  creditsRemaining: number;
   cycle: SubscriptionBillingCycle;
   status: SubscriptionBillingStatus;
   isUpToDate: boolean;

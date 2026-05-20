@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,12 +8,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Availability, Client, Professional, Scheduling, User } from '../../database/entities';
-import { CancellationType, DayOfWeek, SchedulingStatus } from '../../common/enums';
+import { CancellationType, DayOfWeek, SchedulingStatus, UserRole } from '../../common/enums';
 import { CreateSchedulingDto } from './dto/create-scheduling.dto';
 import { ListSchedulingsQueryDto } from './dto/list-schedulings-query.dto';
 import { RescheduleSchedulingDto } from './dto/reschedule-scheduling.dto';
 import { TimeSlot } from './dto/time-slot.dto';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { SubscriptionBillingService } from '../billing/subscription-billing.service';
 
 @Injectable()
 export class SchedulingsService {
@@ -30,6 +33,7 @@ export class SchedulingsService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly schedulingEventsPublisher: SchedulingEventsPublisher,
+    private readonly subscriptionBillingService: SubscriptionBillingService,
   ) {}
 
   async checkProfessionalAvailability(
@@ -73,7 +77,7 @@ export class SchedulingsService {
     return !!conflict;
   }
 
-  async create(dto: CreateSchedulingDto, createdById: string): Promise<Scheduling> {
+  async create(dto: CreateSchedulingDto, actor: JwtPayload): Promise<Scheduling> {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
 
@@ -83,10 +87,12 @@ export class SchedulingsService {
 
     this.ensureFutureDate(startAt);
 
+    const effectiveClientId = await this.resolveEffectiveClientId(dto.clientId, actor);
+
     const [client, professional, creator] = await Promise.all([
-      this.clientRepo.findOne({ where: { id: dto.clientId }, relations: { user: true } }),
+      this.clientRepo.findOne({ where: { id: effectiveClientId }, relations: { user: true } }),
       this.professionalRepo.findOne({ where: { id: dto.professionalId }, relations: { user: true } }),
-      this.userRepo.findOne({ where: { id: createdById } }),
+      this.userRepo.findOne({ where: { id: actor.sub } }),
     ]);
 
     if (!client) throw new NotFoundException('Cliente nao encontrado.');
@@ -94,7 +100,7 @@ export class SchedulingsService {
 
     const [professionalAvailable, clientConflict] = await Promise.all([
       this.checkProfessionalAvailability(dto.professionalId, startAt, endAt),
-      this.checkClientConflict(dto.clientId, startAt, endAt),
+      this.checkClientConflict(effectiveClientId, startAt, endAt),
     ]);
 
     if (!professionalAvailable) {
@@ -103,6 +109,7 @@ export class SchedulingsService {
     if (clientConflict) {
       throw new BadRequestException('Cliente ja possui agendamento neste horario.');
     }
+    await this.assertClientCanSchedule(client, startAt);
 
     const scheduling = this.schedulingRepo.create({
       client,
@@ -114,6 +121,8 @@ export class SchedulingsService {
       status: SchedulingStatus.SCHEDULED,
     });
 
+    client.creditsRemaining = client.creditsRemaining - 1;
+    await this.clientRepo.save(client);
     const created = await this.schedulingRepo.save(scheduling);
     await this.schedulingEventsPublisher.publishCreated({
       schedulingId: created.id,
@@ -126,9 +135,21 @@ export class SchedulingsService {
     return created;
   }
 
-  async findAll(query: ListSchedulingsQueryDto) {
+  async findAll(query: ListSchedulingsQueryDto, actor: JwtPayload) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 30, 100);
+    let forcedClientId: string | null = null;
+    if (actor.role === UserRole.CLIENT) {
+      const ownClient = await this.clientRepo.findOne({
+        where: { user: { id: actor.sub } },
+        relations: { user: true },
+      });
+      if (!ownClient) {
+        throw new NotFoundException('Perfil de cliente nao encontrado para o usuario autenticado.');
+      }
+      forcedClientId = ownClient.id;
+    }
+
     const qb = this.schedulingRepo
       .createQueryBuilder('s')
       .leftJoinAndSelect('s.client', 'client')
@@ -141,7 +162,8 @@ export class SchedulingsService {
       .take(limit);
 
     if (query.status) qb.andWhere('s.status = :status', { status: query.status });
-    if (query.clientId) qb.andWhere('client.id = :clientId', { clientId: query.clientId });
+    const effectiveClientId = forcedClientId ?? query.clientId;
+    if (effectiveClientId) qb.andWhere('client.id = :clientId', { clientId: effectiveClientId });
     if (query.professionalId) {
       qb.andWhere('professional.id = :professionalId', { professionalId: query.professionalId });
     }
@@ -162,23 +184,25 @@ export class SchedulingsService {
     return { items, meta: { page, limit, total } };
   }
 
-  async findOne(id: string): Promise<Scheduling> {
+  async findOne(id: string, actor: JwtPayload): Promise<Scheduling> {
     const scheduling = await this.schedulingRepo.findOne({
       where: { id },
       relations: { client: { user: true }, professional: { user: true }, createdBy: true },
     });
 
     if (!scheduling) throw new NotFoundException('Agendamento nao encontrado.');
+    await this.assertClientOwnership(scheduling, actor);
     return scheduling;
   }
 
-  async cancel(id: string, type: CancellationType, reason?: string): Promise<Scheduling> {
+  async cancel(id: string, actor: JwtPayload, type: CancellationType, reason?: string): Promise<Scheduling> {
     const scheduling = await this.schedulingRepo.findOne({
       where: { id },
       relations: { client: { user: true } },
     });
 
     if (!scheduling) throw new NotFoundException('Agendamento nao encontrado.');
+    await this.assertClientOwnership(scheduling, actor);
     if (scheduling.status !== SchedulingStatus.SCHEDULED) {
       throw new BadRequestException('Apenas agendamentos com status SCHEDULED podem ser cancelados.');
     }
@@ -186,6 +210,10 @@ export class SchedulingsService {
     scheduling.status = SchedulingStatus.CANCELLED;
     scheduling.cancellationType = type;
     scheduling.cancellationReason = reason ?? this.defaultCancellationReason(type);
+    if (type !== CancellationType.NO_SHOW) {
+      scheduling.client.creditsRemaining = scheduling.client.creditsRemaining + 1;
+      await this.clientRepo.save(scheduling.client);
+    }
     const updated = await this.schedulingRepo.save(scheduling);
 
     await this.schedulingEventsPublisher.publishCancelled({
@@ -371,5 +399,58 @@ export class SchedulingsService {
       return 'Cliente nao compareceu.';
     }
     return 'Cliente desmarcou.';
+  }
+
+  private async assertClientCanSchedule(client: Client, schedulingDate: Date): Promise<void> {
+    const subscription = await this.subscriptionBillingService.getClientSubscriptionSnapshot(
+      client,
+      schedulingDate,
+    );
+
+    if (client.creditsRemaining <= 0) {
+      if (subscription.status !== 'NOT_APPLICABLE' && subscription.status !== 'PAID') {
+        throw new BadRequestException(
+          'Impossivel agendar: mensalidade em aberto e creditos do ciclo anterior esgotados.',
+        );
+      }
+
+      throw new BadRequestException('Cliente sem creditos disponiveis para agendar.');
+    }
+  }
+
+  private async resolveEffectiveClientId(
+    requestedClientId: string,
+    actor: JwtPayload,
+  ): Promise<string> {
+    if (actor.role !== UserRole.CLIENT) return requestedClientId;
+
+    const ownClient = await this.clientRepo.findOne({
+      where: { user: { id: actor.sub } },
+      relations: { user: true },
+    });
+
+    if (!ownClient) {
+      throw new NotFoundException('Perfil de cliente nao encontrado para o usuario autenticado.');
+    }
+    if (requestedClientId !== ownClient.id) {
+      throw new ForbiddenException('Cliente autenticado so pode agendar para si proprio.');
+    }
+
+    return ownClient.id;
+  }
+
+  private async assertClientOwnership(scheduling: Scheduling, actor: JwtPayload): Promise<void> {
+    if (actor.role !== UserRole.CLIENT) return;
+
+    const ownClient = await this.clientRepo.findOne({
+      where: { user: { id: actor.sub } },
+      relations: { user: true },
+    });
+    if (!ownClient) {
+      throw new NotFoundException('Perfil de cliente nao encontrado para o usuario autenticado.');
+    }
+    if (scheduling.client.id !== ownClient.id) {
+      throw new ForbiddenException('Cliente autenticado nao tem permissao para este agendamento.');
+    }
   }
 }

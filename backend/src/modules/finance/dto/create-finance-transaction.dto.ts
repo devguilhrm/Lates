@@ -62,4 +62,17 @@ export class CreateFinanceTransactionDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @ApiPropertyOptional({
+    example: 10,
+    minimum: 1,
+    maximum: 500,
+    description: 'Quantidade de creditos adicionados ao cliente para lancamentos de pacote de creditos.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  creditQuantity?: number;
 }

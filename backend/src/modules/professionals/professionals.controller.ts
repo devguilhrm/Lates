@@ -53,7 +53,7 @@ export class ProfessionalsController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL, UserRole.CLIENT)
   @ApiOperation({ summary: 'Listar profissionais' })
   @ApiOkResponse({ description: 'Lista paginada de profissionais.' })
   findAll(@Query() query: ListProfessionalsQueryDto) {
@@ -61,7 +61,7 @@ export class ProfessionalsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL, UserRole.CLIENT)
   @ApiOperation({ summary: 'Buscar profissional por ID' })
   @ApiParam({ name: 'id', description: 'UUID do profissional' })
   @ApiOkResponse({ description: 'Profissional encontrado.' })

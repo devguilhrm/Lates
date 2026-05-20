@@ -32,15 +32,15 @@ export class SchedulingsController {
   @ApiOperation({ summary: 'Criar agendamento' })
   @ApiCreatedResponse({ description: 'Agendamento criado com sucesso.' })
   create(@Body() dto: CreateSchedulingDto, @CurrentUser() user: JwtPayload) {
-    return this.schedulingsService.create(dto, user.sub);
+    return this.schedulingsService.create(dto, user);
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.PROFESSIONAL, UserRole.CLIENT)
   @ApiOperation({ summary: 'Listar agendamentos' })
   @ApiOkResponse({ description: 'Lista paginada de agendamentos.' })
-  findAll(@Query() query: ListSchedulingsQueryDto) {
-    return this.schedulingsService.findAll(query);
+  findAll(@Query() query: ListSchedulingsQueryDto, @CurrentUser() user: JwtPayload) {
+    return this.schedulingsService.findAll(query, user);
   }
 
   @Get(':id')
@@ -48,8 +48,8 @@ export class SchedulingsController {
   @ApiOperation({ summary: 'Buscar agendamento por ID' })
   @ApiParam({ name: 'id', description: 'UUID do agendamento' })
   @ApiOkResponse({ description: 'Agendamento encontrado.' })
-  findOne(@Param('id') id: string) {
-    return this.schedulingsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.schedulingsService.findOne(id, user);
   }
 
   @Patch(':id/cancel')
@@ -57,8 +57,8 @@ export class SchedulingsController {
   @ApiOperation({ summary: 'Cancelar agendamento com motivo categorizado' })
   @ApiParam({ name: 'id', description: 'UUID do agendamento' })
   @ApiOkResponse({ description: 'Agendamento cancelado.' })
-  cancel(@Param('id') id: string, @Body() dto: CancelSchedulingDto) {
-    return this.schedulingsService.cancel(id, dto.type, dto.reason);
+  cancel(@Param('id') id: string, @CurrentUser() user: JwtPayload, @Body() dto: CancelSchedulingDto) {
+    return this.schedulingsService.cancel(id, user, dto.type, dto.reason);
   }
 
   @Patch(':id/complete')

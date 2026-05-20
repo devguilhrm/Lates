@@ -4,12 +4,12 @@ import { Brackets, Repository } from 'typeorm';
 import {
   FinancialTransactionType,
   PaymentMethod,
-  PlanType,
   SchedulingStatus,
   SubscriptionBillingCycle,
   SubscriptionBillingStatus,
 } from '../../common/enums';
 import { Client, ClientBilling, FinancialTransaction, Scheduling } from '../../database/entities';
+import { SubscriptionBillingService } from '../billing/subscription-billing.service';
 import { CreateFinanceTransactionDto } from './dto/create-finance-transaction.dto';
 import { FinanceDashboardQueryDto } from './dto/finance-dashboard-query.dto';
 import { ListFinanceTransactionsQueryDto } from './dto/list-finance-transactions-query.dto';
@@ -30,6 +30,7 @@ export class FinanceService {
     private readonly clientsRepo: Repository<Client>,
     @InjectRepository(ClientBilling)
     private readonly clientBillingsRepo: Repository<ClientBilling>,
+    private readonly subscriptionBillingService: SubscriptionBillingService,
   ) {}
 
   async createTransaction(dto: CreateFinanceTransactionDto): Promise<FinanceTransactionView> {
@@ -44,20 +45,32 @@ export class FinanceService {
     if (dto.clientId && !relatedClient) {
       throw new BadRequestException('Cliente informado para o pagamento nao foi encontrado.');
     }
+    if (this.isCreditPackCategory(dto.category) && !relatedClient) {
+      throw new BadRequestException(
+        'Para registrar pacote de creditos e obrigatorio selecionar o cliente.',
+      );
+    }
 
-    const transaction = this.transactionRepo.create({
+    const created = await this.saveTransaction({
       description: dto.description,
-      amount: dto.amount.toFixed(2),
-      type: dto.type,
+      amount: dto.amount,
       paymentMethod: dto.paymentMethod,
-      cardBrand: dto.paymentMethod === PaymentMethod.CREDIT_CARD ? dto.cardBrand ?? null : null,
-      installments: dto.paymentMethod === PaymentMethod.CREDIT_CARD ? dto.installments ?? 1 : null,
-      category: dto.category?.trim() || null,
+      cardBrand: dto.cardBrand,
+      installments: dto.installments,
+      category: dto.category,
       occurredAt: new Date(dto.occurredAt),
+      type: dto.type,
       client: relatedClient,
+      creditQuantity: dto.creditQuantity,
     });
 
-    const created = await this.transactionRepo.save(transaction);
+    await this.applyCreditPackIfNeeded({
+      category: dto.category,
+      type: dto.type,
+      client: relatedClient,
+      creditQuantity: dto.creditQuantity,
+    });
+
     return this.mapTransaction(created);
   }
 
@@ -99,7 +112,7 @@ export class FinanceService {
   }
 
   async getDashboard(query: FinanceDashboardQueryDto) {
-    await this.ensureRecurringMockBillings(new Date());
+    await this.subscriptionBillingService.ensureRecurringBillings(new Date());
 
     const startDate = query.startDate ? this.parseDate(query.startDate) : null;
     const endDate = query.endDate ? this.parseDate(query.endDate, true) : null;
@@ -207,7 +220,7 @@ export class FinanceService {
   }
 
   async listSubscriptions(query: ListSubscriptionsQueryDto) {
-    await this.ensureRecurringMockBillings(new Date());
+    await this.subscriptionBillingService.ensureRecurringBillings(new Date());
 
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
@@ -255,8 +268,10 @@ export class FinanceService {
 
     const items = clients
       .map((client) => {
-        const cycle = this.planToCycle(client.plan);
-        const currentPeriod = cycle ? this.referencePeriodForCycle(cycle, now) : null;
+        const cycle = this.subscriptionBillingService.planToCycle(client.plan);
+        const currentPeriod = cycle
+          ? this.subscriptionBillingService.referencePeriodForCycle(cycle, now)
+          : null;
         const clientBillingList = billingByClient.get(client.id) ?? [];
         const currentBilling =
           cycle && currentPeriod
@@ -275,6 +290,7 @@ export class FinanceService {
           clientName: client.user.name,
           clientEmail: client.user.email,
           plan: client.plan,
+          creditsRemaining: client.creditsRemaining,
           cycle,
           status,
           isUpToDate: status === SubscriptionBillingStatus.PAID || status === 'NOT_APPLICABLE',
@@ -305,17 +321,17 @@ export class FinanceService {
       throw new BadRequestException('Cliente nao encontrado para registrar mensalidade.');
     }
 
-    const cycle = this.planToCycle(client.plan);
+    const cycle = this.subscriptionBillingService.planToCycle(client.plan);
     if (!cycle) {
       throw new BadRequestException('Plano do cliente nao possui cobranca recorrente.');
     }
 
-    await this.ensureRecurringMockBillings(new Date());
+    await this.subscriptionBillingService.ensureRecurringBillings(new Date());
 
     const now = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
-    const referencePeriod = this.referencePeriodForCycle(cycle, now);
-    const dueDate = this.dueDateForCycle(cycle, now);
-    const amount = dto.amount ?? this.defaultAmountForCycle(cycle);
+    const referencePeriod = this.subscriptionBillingService.referencePeriodForCycle(cycle, now);
+    const dueDate = this.subscriptionBillingService.dueDateForCycle(cycle, now);
+    const amount = dto.amount ?? this.subscriptionBillingService.defaultAmountForCycle(cycle);
 
     let billing = await this.clientBillingsRepo.findOne({
       where: { client: { id: client.id }, cycle, referencePeriod },
@@ -337,22 +353,17 @@ export class FinanceService {
       throw new BadRequestException('Mensalidade/plano deste periodo ja esta em dia.');
     }
 
-    const transaction = await this.transactionRepo.save(
-      this.transactionRepo.create({
-        description:
-          dto.description?.trim() ||
-          `${this.cycleLabel(cycle)} - ${client.user.name}`,
-        amount: amount.toFixed(2),
-        type: FinancialTransactionType.INCOME,
-        paymentMethod: dto.paymentMethod,
-        cardBrand: dto.paymentMethod === PaymentMethod.CREDIT_CARD ? dto.cardBrand ?? null : null,
-        installments:
-          dto.paymentMethod === PaymentMethod.CREDIT_CARD ? dto.installments ?? 1 : null,
-        category: this.cycleCategory(cycle),
-        occurredAt: now,
-        client,
-      }),
-    );
+    const transaction = await this.saveTransaction({
+      description: dto.description?.trim() || `${this.cycleLabel(cycle)} - ${client.user.name}`,
+      amount,
+      paymentMethod: dto.paymentMethod,
+      cardBrand: dto.cardBrand,
+      installments: dto.installments,
+      category: this.cycleCategory(cycle),
+      occurredAt: now,
+      type: FinancialTransactionType.INCOME,
+      client,
+    });
 
     billing.status = SubscriptionBillingStatus.PAID;
     billing.paidAt = now;
@@ -394,87 +405,56 @@ export class FinanceService {
     return { ...item, amount: this.parseNumber(item.amount) };
   }
 
-  private async ensureRecurringMockBillings(referenceDate: Date): Promise<void> {
-    const clients = await this.clientsRepo.find({
-      relations: { user: true },
-      where: {
-        user: { isActive: true },
-      },
+  private async saveTransaction(params: {
+    description: string;
+    amount: number;
+    paymentMethod: PaymentMethod;
+    cardBrand?: CreateFinanceTransactionDto['cardBrand'];
+    installments?: number;
+    category?: string;
+    occurredAt: Date;
+    type: FinancialTransactionType;
+    client?: Client | null;
+    creditQuantity?: number;
+  }): Promise<FinancialTransaction> {
+    const transaction = this.transactionRepo.create({
+      description: params.description,
+      amount: params.amount.toFixed(2),
+      type: params.type,
+      paymentMethod: params.paymentMethod,
+      cardBrand:
+        params.paymentMethod === PaymentMethod.CREDIT_CARD ? params.cardBrand ?? null : null,
+      installments:
+        params.paymentMethod === PaymentMethod.CREDIT_CARD ? params.installments ?? 1 : null,
+      category: params.category?.trim() || null,
+      occurredAt: params.occurredAt,
+      client: params.client ?? null,
+      creditQuantity:
+        this.isCreditPackCategory(params.category) && params.type === FinancialTransactionType.INCOME
+          ? params.creditQuantity ?? 10
+          : null,
     });
 
-    for (const client of clients) {
-      const cycle = this.planToCycle(client.plan);
-      if (!cycle) continue;
-
-      const referencePeriod = this.referencePeriodForCycle(cycle, referenceDate);
-      const dueDate = this.dueDateForCycle(cycle, referenceDate);
-      const existing = await this.clientBillingsRepo.findOne({
-        where: { client: { id: client.id }, cycle, referencePeriod },
-        relations: { client: true },
-      });
-
-      if (!existing) {
-        const pending = this.clientBillingsRepo.create({
-          client,
-          cycle,
-          referencePeriod,
-          dueDate,
-          amount: this.defaultAmountForCycle(cycle).toFixed(2),
-          status: this.statusByDueDate(dueDate),
-        });
-        await this.clientBillingsRepo.save(pending);
-        continue;
-      }
-
-      if (
-        existing.status !== SubscriptionBillingStatus.PAID &&
-        existing.status !== this.statusByDueDate(existing.dueDate)
-      ) {
-        existing.status = this.statusByDueDate(existing.dueDate);
-        await this.clientBillingsRepo.save(existing);
-      }
-    }
+    return this.transactionRepo.save(transaction);
   }
 
-  private planToCycle(plan: PlanType): SubscriptionBillingCycle | null {
-    if (plan === PlanType.MONTHLY) return SubscriptionBillingCycle.MONTHLY;
-    if (plan === PlanType.QUARTERLY) return SubscriptionBillingCycle.QUARTERLY;
-    if (plan === PlanType.ANNUAL) return SubscriptionBillingCycle.ANNUAL;
-    return null;
+  private async applyCreditPackIfNeeded(params: {
+    category?: string;
+    type: FinancialTransactionType;
+    client?: Client | null;
+    creditQuantity?: number;
+  }): Promise<void> {
+    if (!this.isCreditPackCategory(params.category)) return;
+    if (params.type !== FinancialTransactionType.INCOME) return;
+    if (!params.client) return;
+
+    const quantity = params.creditQuantity ?? 10;
+    params.client.creditsRemaining += quantity;
+    await this.clientsRepo.save(params.client);
   }
 
-  private defaultAmountForCycle(cycle: SubscriptionBillingCycle): number {
-    const amountByCycle: Record<SubscriptionBillingCycle, number> = {
-      MONTHLY: 320,
-      QUARTERLY: 900,
-      ANNUAL: 3200,
-    };
-    return amountByCycle[cycle];
-  }
-
-  private referencePeriodForCycle(cycle: SubscriptionBillingCycle, referenceDate: Date): string {
-    const year = referenceDate.getFullYear();
-    const month = referenceDate.getMonth();
-
-    if (cycle === SubscriptionBillingCycle.ANNUAL) {
-      return `${year}-01-01`;
-    }
-    if (cycle === SubscriptionBillingCycle.QUARTERLY) {
-      const quarterStartMonth = Math.floor(month / 3) * 3 + 1;
-      return `${year}-${`${quarterStartMonth}`.padStart(2, '0')}-01`;
-    }
-    return `${year}-${`${month + 1}`.padStart(2, '0')}-01`;
-  }
-
-  private dueDateForCycle(cycle: SubscriptionBillingCycle, referenceDate: Date): string {
-    return this.referencePeriodForCycle(cycle, referenceDate);
-  }
-
-  private statusByDueDate(dueDate: string): SubscriptionBillingStatus {
-    const due = new Date(`${dueDate}T00:00:00`);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return due < now ? SubscriptionBillingStatus.OVERDUE : SubscriptionBillingStatus.PENDING;
+  private isCreditPackCategory(category?: string | null): boolean {
+    return (category ?? '').trim().toLowerCase() === 'pacote de creditos';
   }
 
   private cycleCategory(cycle: SubscriptionBillingCycle): string {

@@ -18,13 +18,17 @@ import { ThemeService } from './core/theme/theme.service';
           </div>
 
           <nav>
-            <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNav()">Dashboard</a>
-            <a routerLink="/clients" routerLinkActive="active" (click)="closeNav()">Clientes</a>
-            <a routerLink="/professionals" routerLinkActive="active" (click)="closeNav()">Profissionais</a>
-            <a routerLink="/scheduling" routerLinkActive="active" (click)="closeNav()">Agenda</a>
-            <a routerLink="/reports" routerLinkActive="active" (click)="closeNav()">Relatorios</a>
-            <a routerLink="/finance" routerLinkActive="active" (click)="closeNav()">Financeiro</a>
-            <a routerLink="/services" routerLinkActive="active" (click)="closeNav()">Servicos</a>
+            @if (auth.role() === 'CLIENT') {
+              <a routerLink="/my-schedule" routerLinkActive="active" (click)="closeNav()">Meus agendamentos</a>
+            } @else {
+              <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNav()">Dashboard</a>
+              <a routerLink="/clients" routerLinkActive="active" (click)="closeNav()">Clientes</a>
+              <a routerLink="/professionals" routerLinkActive="active" (click)="closeNav()">Profissionais</a>
+              <a routerLink="/scheduling" routerLinkActive="active" (click)="closeNav()">Agenda</a>
+              <a routerLink="/reports" routerLinkActive="active" (click)="closeNav()">Relatorios</a>
+              <a routerLink="/finance" routerLinkActive="active" (click)="closeNav()">Financeiro</a>
+              <a routerLink="/services" routerLinkActive="active" (click)="closeNav()">Servicos</a>
+            }
           </nav>
         </aside>
 
@@ -34,7 +38,9 @@ import { ThemeService } from './core/theme/theme.service';
               <button type="button" class="menu-button" (click)="toggleNav()" aria-label="Abrir menu">&#9776;</button>
               <div>
                 <span class="eyebrow">Operacao da clinica</span>
-                <h1>LatesOS | Gestao de agenda, alunos e profissionais</h1>
+                <h1>
+                  {{ auth.role() === 'CLIENT' ? 'LatesOS | Area do cliente' : 'LatesOS | Gestao de agenda, alunos e profissionais' }}
+                </h1>
               </div>
             </div>
             <div class="actions">

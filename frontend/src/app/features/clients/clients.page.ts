@@ -67,6 +67,14 @@ interface PlanOption {
           <span>Buscar por nome</span>
           <input [value]="search()" (input)="onSearch($any($event.target).value)" placeholder="Digite o nome do cliente" />
         </label>
+        <label class="field">
+          <span>Adimplencia</span>
+          <select [value]="billingFilter()" (change)="onBillingFilter($any($event.target).value)">
+            <option value="ALL">Todos</option>
+            <option value="NOT_UP_TO_DATE">Nao em dia</option>
+            <option value="UP_TO_DATE">Em dia</option>
+          </select>
+        </label>
       </section>
 
       @if (error()) {
@@ -76,7 +84,7 @@ interface PlanOption {
       <section class="panel">
         <table class="table">
           <thead>
-            <tr><th>Nome</th><th>E-mail</th><th>Plano</th><th>Creditos</th><th>Status</th><th>Acoes</th></tr>
+            <tr><th>Nome</th><th>E-mail</th><th>Plano</th><th>Creditos</th><th>Mensalidade</th><th>Status</th><th>Acoes</th></tr>
           </thead>
           <tbody>
             @for (client of clients(); track client.id) {
@@ -85,6 +93,7 @@ interface PlanOption {
                 <td>{{ client.user.email }}</td>
                 <td>{{ planLabel(client.plan) }}</td>
                 <td>{{ client.creditsRemaining }}</td>
+                <td>{{ billingLabel(client) }}</td>
                 <td>{{ client.user.isActive ? 'Ativo' : 'Inativo' }}</td>
                 <td class="toolbar">
                   <button class="secondary-button" type="button" (click)="edit(client)">Editar</button>
@@ -92,7 +101,7 @@ interface PlanOption {
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="muted">Nenhum cliente encontrado.</td></tr>
+              <tr><td colspan="7" class="muted">Nenhum cliente encontrado.</td></tr>
             }
           </tbody>
         </table>
@@ -141,6 +150,7 @@ export class ClientsPage {
   protected readonly error = signal('');
   protected readonly editingClientId = signal<string | null>(null);
   protected readonly search = signal('');
+  protected readonly billingFilter = signal<'ALL' | 'NOT_UP_TO_DATE' | 'UP_TO_DATE'>('ALL');
   protected readonly selectedAnamnesisPreset = signal('');
 
   protected readonly form = this.fb.nonNullable.group({
@@ -165,11 +175,34 @@ export class ClientsPage {
     this.load();
   }
 
+  protected onBillingFilter(value: 'ALL' | 'NOT_UP_TO_DATE' | 'UP_TO_DATE'): void {
+    this.billingFilter.set(value);
+    this.load();
+  }
+
+  protected billingLabel(client: Client): string {
+    if (client.subscriptionStatus === 'PAID' || client.subscriptionStatus === 'NOT_APPLICABLE') {
+      return 'Em dia';
+    }
+    if (client.subscriptionStatus === 'OVERDUE') return 'Atrasado';
+    if (client.subscriptionStatus === 'PENDING') return 'Pendente';
+    return '-';
+  }
+
   protected load(): void {
     this.api
-      .getPaginated<Client>('/clients', { limit: 100, search: this.search() || undefined })
+      .getPaginated<Client>('/clients', {
+        limit: 100,
+        search: this.search() || undefined,
+        onlyNotUpToDate: this.billingFilter() === 'NOT_UP_TO_DATE' ? true : undefined,
+      })
       .subscribe({
-        next: (result) => this.clients.set(result.items),
+        next: (result) => {
+          const items = this.billingFilter() === 'UP_TO_DATE'
+            ? result.items.filter((client) => client.isUpToDate !== false)
+            : result.items;
+          this.clients.set(items);
+        },
         error: () => this.error.set('Nao foi possivel carregar clientes.'),
       });
   }

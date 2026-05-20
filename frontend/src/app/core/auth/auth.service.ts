@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiService } from '../http/api.service';
+import { UserRole } from '../models/domain.models';
 
 interface AuthTokens {
   accessToken: string;
@@ -19,8 +20,12 @@ export class AuthService {
   private readonly accessTokenSignal = signal(
     localStorage.getItem(ACCESS_TOKEN_KEY) ?? localStorage.getItem(LEGACY_ACCESS_TOKEN_KEY),
   );
+  private readonly roleSignal = signal<UserRole | null>(
+    this.parseRoleFromToken(this.accessTokenSignal()),
+  );
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSignal());
+  readonly role = computed(() => this.roleSignal());
 
   get accessToken(): string | null {
     return this.accessTokenSignal();
@@ -36,6 +41,7 @@ export class AuthService {
     localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
     localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
     this.accessTokenSignal.set(tokens.accessToken);
+    this.roleSignal.set(this.parseRoleFromToken(tokens.accessToken));
   }
 
   logout(): void {
@@ -44,6 +50,20 @@ export class AuthService {
     localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
     localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
     this.accessTokenSignal.set(null);
+    this.roleSignal.set(null);
     void this.router.navigateByUrl('/login');
+  }
+
+  private parseRoleFromToken(token: string | null): UserRole | null {
+    if (!token) return null;
+
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+      const decoded = JSON.parse(atob(payload)) as { role?: UserRole };
+      return decoded.role ?? null;
+    } catch {
+      return null;
+    }
   }
 }

@@ -145,7 +145,8 @@ export class LoginPage {
     this.auth.login(this.form.controls.email.value, this.form.controls.password.value).subscribe({
       next: (tokens) => {
         this.auth.storeTokens(tokens);
-        void this.router.navigateByUrl('/dashboard');
+        const target = this.auth.role() === 'CLIENT' ? '/my-schedule' : '/dashboard';
+        void this.router.navigateByUrl(target);
       },
       error: (error) => {
         const message =

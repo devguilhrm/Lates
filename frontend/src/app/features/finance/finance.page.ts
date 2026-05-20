@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
 import {
   CardBrand,
+  Client,
   FinanceDashboard,
   FinancialTransaction,
   FinancialTransactionType,
@@ -77,6 +78,10 @@ interface CardBrandOption {
           <button class="secondary-button" type="button" (click)="loadSubscriptions()">Atualizar status</button>
         </div>
 
+        @if (subscriptionError()) {
+          <p class="error">{{ subscriptionError() }}</p>
+        }
+
         <div class="toolbar filters-row">
           <label class="field compact-field">
             <span>Buscar cliente</span>
@@ -95,13 +100,14 @@ interface CardBrandOption {
 
         <table class="table">
           <thead>
-            <tr><th>Cliente</th><th>Plano</th><th>Vencimento</th><th>Status</th><th>Ultimo pagamento</th><th>Acao</th></tr>
+            <tr><th>Cliente</th><th>Plano</th><th>Creditos</th><th>Vencimento</th><th>Status</th><th>Ultimo pagamento</th><th>Acao</th></tr>
           </thead>
           <tbody>
             @for (item of subscriptions(); track item.clientId) {
               <tr>
                 <td>{{ item.clientName }}</td>
                 <td>{{ planLabel(item.plan) }}</td>
+                <td>{{ item.creditsRemaining }}</td>
                 <td>{{ item.dueDate ? (item.dueDate | date: 'dd/MM/yyyy') : '-' }}</td>
                 <td>
                   <span class="status-chip" [class.ok]="item.status === 'PAID' || item.status === 'NOT_APPLICABLE'" [class.warn]="item.status === 'PENDING'" [class.late]="item.status === 'OVERDUE'">
@@ -114,18 +120,77 @@ interface CardBrandOption {
                     class="primary-button"
                     type="button"
                     [disabled]="item.status === 'PAID' || item.status === 'NOT_APPLICABLE' || saving()"
-                    (click)="registerSubscriptionPayment(item)"
+                    (click)="openSubscriptionPaymentModal(item)"
                   >
                     Dar entrada
                   </button>
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="muted">Nenhum cliente encontrado para controle de mensalidade.</td></tr>
+              <tr><td colspan="7" class="muted">Nenhum cliente encontrado para controle de mensalidade.</td></tr>
             }
           </tbody>
         </table>
       </section>
+
+      @if (selectedSubscription()) {
+        <section class="panel">
+          <h3>Dar entrada em mensalidade</h3>
+          <p class="muted">
+            Cliente: {{ selectedSubscription()?.clientName }} |
+            Plano: {{ planLabel(selectedSubscription()?.plan || 'MONTHLY') }}
+          </p>
+          <form class="grid cols-3" [formGroup]="subscriptionPaymentForm" (ngSubmit)="submitSubscriptionPayment()">
+            <label class="field">
+              <span>Descricao</span>
+              <input formControlName="description" />
+            </label>
+            <label class="field">
+              <span>Valor</span>
+              <input type="number" step="0.01" min="0.01" formControlName="amount" />
+            </label>
+            <label class="field">
+              <span>Forma de pagamento</span>
+              <select formControlName="paymentMethod">
+                @for (method of paymentMethodOptions; track method.value) {
+                  <option [value]="method.value">{{ method.label }}</option>
+                }
+              </select>
+            </label>
+
+            @if (subscriptionPaymentForm.controls.paymentMethod.value === 'CREDIT_CARD') {
+              <label class="field">
+                <span>Bandeira</span>
+                <select formControlName="cardBrand">
+                  <option value="">Selecione</option>
+                  @for (brand of cardBrandOptions; track brand.value) {
+                    <option [value]="brand.value">{{ brand.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field">
+                <span>Parcelas</span>
+                <input type="number" min="1" max="24" formControlName="installments" />
+              </label>
+            }
+
+            <label class="field">
+              <span>Data</span>
+              <input type="datetime-local" formControlName="occurredAt" />
+            </label>
+
+            <div class="field toolbar">
+              <span>&nbsp;</span>
+              <button class="primary-button" type="submit" [disabled]="subscriptionPaymentForm.invalid || saving()">
+                Confirmar entrada
+              </button>
+              <button class="secondary-button" type="button" (click)="closeSubscriptionPaymentModal()">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </section>
+      }
 
       <section class="panel">
         <h3>Entradas e saidas por mes</h3>
@@ -166,6 +231,15 @@ interface CardBrandOption {
             <input formControlName="description" placeholder="Ex: Mensalidade de aluno" />
           </label>
           <label class="field">
+            <span>Cliente</span>
+            <select formControlName="clientId">
+              <option value="">Nao vincular</option>
+              @for (client of clients(); track client.id) {
+                <option [value]="client.id">{{ client.user.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
             <span>Valor</span>
             <input type="number" step="0.01" min="0.01" formControlName="amount" />
           </label>
@@ -188,6 +262,13 @@ interface CardBrandOption {
             <span>Categoria</span>
             <input formControlName="category" placeholder="Opcional" />
           </label>
+
+          @if (transactionForm.controls.billingPresetId.value === 'CREDIT_PACK') {
+            <label class="field">
+              <span>Quantidade de creditos</span>
+              <input type="number" min="1" max="500" formControlName="creditQuantity" />
+            </label>
+          }
 
           @if (transactionForm.controls.paymentMethod.value === 'CREDIT_CARD') {
             <label class="field">
@@ -429,12 +510,15 @@ export class FinancePage {
   ];
 
   protected readonly dashboard = signal<FinanceDashboard | null>(null);
+  protected readonly clients = signal<Client[]>([]);
   protected readonly transactions = signal<FinancialTransaction[]>([]);
   protected readonly subscriptions = signal<SubscriptionBillingItem[]>([]);
   protected readonly typeFilter = signal<FinancialTransactionType | ''>('');
   protected readonly subscriptionSearch = signal('');
   protected readonly subscriptionStatusFilter = signal<'PAID' | 'PENDING' | 'OVERDUE' | ''>('');
   protected readonly saving = signal(false);
+  protected readonly subscriptionError = signal('');
+  protected readonly selectedSubscription = signal<SubscriptionBillingItem | null>(null);
   protected readonly incomePresets = signal<BillingPreset[]>(
     this.billingPresets.filter((preset) => preset.type === 'INCOME'),
   );
@@ -447,13 +531,24 @@ export class FinancePage {
   protected readonly transactionForm = this.fb.nonNullable.group({
     billingPresetId: ['MONTHLY_PLAN', Validators.required],
     description: ['', [Validators.required, Validators.maxLength(140)]],
+    clientId: [''],
     amount: [0, [Validators.required, Validators.min(0.01)]],
     type: ['INCOME' as FinancialTransactionType, Validators.required],
     paymentMethod: ['PIX' as PaymentMethod, Validators.required],
     cardBrand: ['' as CardBrand | ''],
     installments: [1],
     category: [''],
+    creditQuantity: [10],
     occurredAt: [this.todayDate(), Validators.required],
+  });
+
+  protected readonly subscriptionPaymentForm = this.fb.nonNullable.group({
+    description: ['', [Validators.required, Validators.maxLength(140)]],
+    amount: [0, [Validators.required, Validators.min(0.01)]],
+    paymentMethod: ['PIX' as PaymentMethod, Validators.required],
+    cardBrand: ['' as CardBrand | ''],
+    installments: [1],
+    occurredAt: [this.todayDateTimeLocal(), Validators.required],
   });
 
   constructor() {
@@ -465,26 +560,41 @@ export class FinancePage {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((paymentMethod) => this.applyPaymentMethodRules(paymentMethod));
 
+    this.subscriptionPaymentForm.controls.paymentMethod.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((paymentMethod) => this.applySubscriptionPaymentMethodRules(paymentMethod));
+
     this.applyPreset('MONTHLY_PLAN');
     this.applyPaymentMethodRules(this.transactionForm.controls.paymentMethod.value);
+    this.applySubscriptionPaymentMethodRules(this.subscriptionPaymentForm.controls.paymentMethod.value);
     this.applyFilters();
   }
 
   protected applyFilters(): void {
     const period = this.periodForm.getRawValue();
     this.api.get<FinanceDashboard>('/finance/dashboard', period).subscribe((result) => this.dashboard.set(result));
+    this.loadClients();
     this.loadTransactions();
     this.loadSubscriptions();
   }
 
   protected loadSubscriptions(): void {
+    this.subscriptionError.set('');
     this.api
       .getPaginated<SubscriptionBillingItem>('/finance/subscriptions', {
-        limit: 200,
+        limit: 100,
         search: this.subscriptionSearch() || undefined,
         status: this.subscriptionStatusFilter() || undefined,
       })
-      .subscribe((result) => this.subscriptions.set(result.items));
+      .subscribe({
+        next: (result) => this.subscriptions.set(result.items),
+        error: () => {
+          this.subscriptions.set([]);
+          this.subscriptionError.set(
+            'Nao foi possivel carregar mensalidades. Verifique permissao de acesso e parametros de filtro.',
+          );
+        },
+      });
   }
 
   protected onSubscriptionSearch(value: string): void {
@@ -497,15 +607,42 @@ export class FinancePage {
     this.loadSubscriptions();
   }
 
-  protected registerSubscriptionPayment(item: SubscriptionBillingItem): void {
+  protected openSubscriptionPaymentModal(item: SubscriptionBillingItem): void {
+    this.selectedSubscription.set(item);
+    this.subscriptionPaymentForm.patchValue({
+      description: `Mensalidade - ${item.clientName}`,
+      amount: item.amount ?? this.defaultAmountByPlan(item.plan),
+      paymentMethod: 'PIX',
+      cardBrand: '',
+      installments: 1,
+      occurredAt: this.todayDateTimeLocal(),
+    });
+    this.applySubscriptionPaymentMethodRules('PIX');
+  }
+
+  protected closeSubscriptionPaymentModal(): void {
+    this.selectedSubscription.set(null);
+  }
+
+  protected submitSubscriptionPayment(): void {
+    const item = this.selectedSubscription();
+    if (!item || this.subscriptionPaymentForm.invalid) return;
+
+    const payload = this.subscriptionPaymentForm.getRawValue();
     this.saving.set(true);
     this.api
       .post(`/finance/subscriptions/${item.clientId}/pay`, {
-        paymentMethod: 'PIX',
+        description: payload.description,
+        amount: payload.amount,
+        paymentMethod: payload.paymentMethod,
+        cardBrand: payload.paymentMethod === 'CREDIT_CARD' ? payload.cardBrand : undefined,
+        installments: payload.paymentMethod === 'CREDIT_CARD' ? payload.installments : undefined,
+        occurredAt: this.toIsoFromLocal(payload.occurredAt),
       })
       .subscribe({
         next: () => {
           this.saving.set(false);
+          this.closeSubscriptionPaymentModal();
           this.applyFilters();
         },
         error: () => this.saving.set(false),
@@ -536,6 +673,9 @@ export class FinancePage {
         cardBrand: payload.paymentMethod === 'CREDIT_CARD' ? payload.cardBrand : undefined,
         installments: payload.paymentMethod === 'CREDIT_CARD' ? payload.installments : undefined,
         category: payload.category,
+        clientId: payload.clientId || undefined,
+        creditQuantity:
+          payload.billingPresetId === 'CREDIT_PACK' ? payload.creditQuantity : undefined,
         occurredAt: payload.occurredAt,
       })
       .subscribe({
@@ -582,6 +722,8 @@ export class FinancePage {
   private applyPreset(presetId: string): void {
     const preset = this.billingPresets.find((item) => item.id === presetId);
     if (!preset) return;
+    const clientIdControl = this.transactionForm.controls.clientId;
+    const creditQuantityControl = this.transactionForm.controls.creditQuantity;
 
     this.transactionForm.patchValue(
       {
@@ -589,12 +731,25 @@ export class FinancePage {
         category: preset.category,
         description: preset.description,
         amount: preset.defaultAmount,
+        clientId: '',
+        creditQuantity: preset.id === 'CREDIT_PACK' ? 10 : 1,
         paymentMethod: 'PIX',
         cardBrand: '',
         installments: 1,
       },
       { emitEvent: false },
     );
+
+    if (preset.id === 'CREDIT_PACK') {
+      clientIdControl.setValidators([Validators.required]);
+      creditQuantityControl.setValidators([Validators.required, Validators.min(1), Validators.max(500)]);
+    } else {
+      clientIdControl.clearValidators();
+      creditQuantityControl.clearValidators();
+    }
+
+    clientIdControl.updateValueAndValidity({ emitEvent: false });
+    creditQuantityControl.updateValueAndValidity({ emitEvent: false });
     this.applyPaymentMethodRules('PIX');
   }
 
@@ -616,6 +771,28 @@ export class FinancePage {
     installmentsControl.updateValueAndValidity({ emitEvent: false });
   }
 
+  private applySubscriptionPaymentMethodRules(paymentMethod: PaymentMethod): void {
+    const cardBrandControl = this.subscriptionPaymentForm.controls.cardBrand;
+    const installmentsControl = this.subscriptionPaymentForm.controls.installments;
+
+    if (paymentMethod === 'CREDIT_CARD') {
+      cardBrandControl.setValidators([Validators.required]);
+      installmentsControl.setValidators([Validators.required, Validators.min(1), Validators.max(24)]);
+    } else {
+      cardBrandControl.clearValidators();
+      installmentsControl.clearValidators();
+      cardBrandControl.setValue('', { emitEvent: false });
+      installmentsControl.setValue(1, { emitEvent: false });
+    }
+
+    cardBrandControl.updateValueAndValidity({ emitEvent: false });
+    installmentsControl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private loadClients(): void {
+    this.api.getPaginated<Client>('/clients', { limit: 100 }).subscribe((result) => this.clients.set(result.items));
+  }
+
   private loadTransactions(): void {
     const period = this.periodForm.getRawValue();
     this.api
@@ -632,6 +809,16 @@ export class FinancePage {
     return this.toDateInput(new Date());
   }
 
+  private todayDateTimeLocal(): string {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = `${now.getMonth() + 1}`.padStart(2, '0');
+    const dd = `${now.getDate()}`.padStart(2, '0');
+    const hh = `${now.getHours()}`.padStart(2, '0');
+    const min = `${now.getMinutes()}`.padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  }
+
   private startOfMonth(): string {
     const now = new Date();
     return this.toDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -642,5 +829,16 @@ export class FinancePage {
     const month = `${value.getMonth() + 1}`.padStart(2, '0');
     const day = `${value.getDate()}`.padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private defaultAmountByPlan(plan: SubscriptionBillingItem['plan']): number {
+    if (plan === 'ANNUAL') return 3200;
+    if (plan === 'QUARTERLY') return 900;
+    return 320;
+  }
+
+  private toIsoFromLocal(local: string): string {
+    const date = new Date(local);
+    return date.toISOString();
   }
 }

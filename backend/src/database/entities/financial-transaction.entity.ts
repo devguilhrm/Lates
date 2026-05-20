@@ -28,6 +28,9 @@ export class FinancialTransaction {
   @Column({ type: 'varchar', nullable: true })
   category?: string | null;
 
+  @Column({ type: 'int', nullable: true })
+  creditQuantity?: number | null;
+
   @Column({ type: 'timestamptz' })
   occurredAt!: Date;
 

@@ -12,6 +12,8 @@ import { UserRole } from '../../common/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { ListClientsQueryDto } from './dto/list-clients-query.dto';
@@ -37,6 +39,14 @@ export class ClientsController {
   @ApiOkResponse({ description: 'Lista paginada de clientes.' })
   findAll(@Query() query: ListClientsQueryDto) {
     return this.clientsService.findAll(query);
+  }
+
+  @Get('me')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.CLIENT)
+  @ApiOperation({ summary: 'Retornar cliente do usuario autenticado' })
+  @ApiOkResponse({ description: 'Cliente autenticado.' })
+  findMe(@CurrentUser() user: JwtPayload) {
+    return this.clientsService.findByUserId(user.sub);
   }
 
   @Get(':id')

@@ -42,4 +42,10 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/services/services.page').then((m) => m.ServicesPage),
   },
+  {
+    path: 'my-schedule',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/client-booking/client-booking.page').then((m) => m.ClientBookingPage),
+  },
 ];

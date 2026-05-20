@@ -1,5 +1,5 @@
-import { IsEmail, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { PlanType } from '../../../common/enums';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -18,6 +18,15 @@ export class ListClientsQueryDto {
   @IsOptional()
   @IsEnum(PlanType)
   plan?: PlanType;
+
+  @ApiPropertyOptional({
+    description: 'Quando true, lista apenas clientes que nao estao em dia com mensalidade/plano.',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  onlyNotUpToDate?: boolean;
 
   @ApiPropertyOptional({ example: 1, minimum: 1, default: 1 })
   @IsOptional()

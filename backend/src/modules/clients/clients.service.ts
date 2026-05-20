@@ -10,6 +10,13 @@ import { UpdateClientDto } from './dto/update-client.dto';
 
 @Injectable()
 export class ClientsService {
+  private readonly planCredits = {
+    MONTHLY: 12,
+    ANNUAL: 144,
+    QUARTERLY: 36,
+    CREDIT_PACK: 10,
+  } as const;
+
   constructor(
     @InjectRepository(Client)
     private readonly clientsRepo: Repository<Client>,
@@ -22,14 +29,16 @@ export class ClientsService {
   async create(dto: CreateClientDto): Promise<Client> {
     await this.ensureEmailAvailable(dto.email);
 
-    const user = await this.usersRepo.save(this.usersRepo.create({
-      name: dto.name,
-      email: dto.email,
-      passwordHash: await bcrypt.hash(dto.password, 10),
-      role: UserRole.CLIENT,
-      phone: dto.phone,
-      avatarUrl: dto.avatarUrl,
-    }));
+    const user = await this.usersRepo.save(
+      this.usersRepo.create({
+        name: dto.name,
+        email: dto.email,
+        passwordHash: await bcrypt.hash(dto.password, 10),
+        role: UserRole.CLIENT,
+        phone: dto.phone,
+        avatarUrl: dto.avatarUrl,
+      }),
+    );
 
     const client = this.clientsRepo.create({
       user,
@@ -37,7 +46,7 @@ export class ClientsService {
       anamnesis: dto.anamnesis,
       emergencyContact: dto.emergencyContact,
       plan: dto.plan,
-      creditsRemaining: dto.creditsRemaining ?? 0,
+      creditsRemaining: dto.creditsRemaining ?? this.defaultCreditsByPlan(dto.plan),
     });
 
     return this.clientsRepo.save(client);
@@ -71,7 +80,7 @@ export class ClientsService {
       relations: { user: true },
     });
 
-    if (!client) throw new NotFoundException('Cliente não encontrado.');
+    if (!client) throw new NotFoundException('Cliente nao encontrado.');
     return client;
   }
 
@@ -92,7 +101,14 @@ export class ClientsService {
     if (dto.birthDate !== undefined) client.birthDate = dto.birthDate ? new Date(dto.birthDate) : null;
     if (dto.anamnesis !== undefined) client.anamnesis = dto.anamnesis;
     if (dto.emergencyContact !== undefined) client.emergencyContact = dto.emergencyContact;
-    if (dto.plan !== undefined) client.plan = dto.plan;
+
+    if (dto.plan !== undefined) {
+      client.plan = dto.plan;
+      if (dto.creditsRemaining === undefined) {
+        client.creditsRemaining = this.defaultCreditsByPlan(dto.plan);
+      }
+    }
+
     if (dto.creditsRemaining !== undefined) client.creditsRemaining = dto.creditsRemaining;
 
     await this.usersRepo.save(client.user);
@@ -110,13 +126,17 @@ export class ClientsService {
     await this.findOne(id);
     return this.schedulingsRepo.find({
       where: { client: { id } },
-      relations: { client: { user: true }, professional: { user: true } },
+      relations: { client: { user: true }, professional: { user: true }, createdBy: true },
       order: { startAt: 'DESC' },
     });
   }
 
   private async ensureEmailAvailable(email: string): Promise<void> {
     const exists = await this.usersRepo.exists({ where: { email } });
-    if (exists) throw new ConflictException('E-mail já cadastrado.');
+    if (exists) throw new ConflictException('E-mail ja cadastrado.');
+  }
+
+  private defaultCreditsByPlan(plan: Client['plan']): number {
+    return this.planCredits[plan];
   }
 }

@@ -1,55 +1,252 @@
 ﻿# LatesOS
 
-Sistema de gestão para clínicas de Pilates e Fisioterapia, com foco em operação diária, agenda, financeiro, relatórios e geração de orçamento em PDF.
+<p align="center">
+  <img src="frontend/public/assets/logo.png" alt="LatesOS Logo" width="180" />
+</p>
 
-## Visão Geral
+<p align="center">
+  Plataforma de gestao operacional para clinicas de Pilates e Fisioterapia.
+</p>
 
-O projeto é dividido em duas aplicações:
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-success" alt="Status" />
+  <img src="https://img.shields.io/badge/Backend-NestJS%2011-E0234E" alt="NestJS" />
+  <img src="https://img.shields.io/badge/Frontend-Angular%2021-DD0031" alt="Angular" />
+  <img src="https://img.shields.io/badge/Database-PostgreSQL-336791" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Messaging-Kafka-231F20" alt="Kafka" />
+  <img src="https://img.shields.io/badge/Auth-JWT-000000" alt="JWT" />
+  <img src="https://img.shields.io/badge/API-Swagger-85EA2D" alt="Swagger" />
+</p>
 
-- `backend`: API REST em NestJS + TypeORM + PostgreSQL.
-- `frontend`: SPA em Angular (standalone components).
+## Sumario
 
-## Principais Funcionalidades
+- [Visao Executiva](#visao-executiva)
+- [Problema de Negocio](#problema-de-negocio)
+- [Solucoes Entregues pelo LatesOS](#solucoes-entregues-pelo-latesos)
+- [Arquitetura da Plataforma](#arquitetura-da-plataforma)
+- [Fluxo de Agendamentos com Kafka e Banco](#fluxo-de-agendamentos-com-kafka-e-banco)
+- [Modelo de Dados Principal](#modelo-de-dados-principal)
+- [Modulos do Sistema](#modulos-do-sistema)
+- [Tecnologias](#tecnologias)
+- [Como Executar Localmente](#como-executar-localmente)
+- [Ambientes e Configuracoes](#ambientes-e-configuracoes)
+- [Qualidade e Observabilidade](#qualidade-e-observabilidade)
+- [Seguranca](#seguranca)
+- [Roadmap Tecnico](#roadmap-tecnico)
+- [Documentacao Complementar](#documentacao-complementar)
 
-- Autenticação JWT com refresh token.
-- Gestão de clientes e profissionais (CRUD + busca).
-- Agenda com validações de conflito, remarcação e cancelamento com motivo.
-- Financeiro com lançamentos de entrada/saída e dashboard.
-- Controle de cobranças recorrentes (mensal/trimestral/anual) com status de pagamento.
-- Relatórios gerenciais (eficiência por profissional e auditoria de abertura).
-- Módulo de serviços com geração de orçamento em PDF.
+## Visao Executiva
 
-## Estrutura
+O **LatesOS** e uma plataforma de gestao completa para operacao clinica, integrando atendimento, agenda, financeiro e analise gerencial em uma unica solucao.
 
-```text
-.
-├── backend/
-├── frontend/
-├── docker-compose.yml
-└── .gitignore
+A proposta e reduzir retrabalho operacional e aumentar previsibilidade de receita, organizando o ciclo completo da clinica:
+
+- captacao e cadastro,
+- agendamento e execucao,
+- cobranca e recorrencia,
+- analise de eficiencia e auditoria.
+
+## Problema de Negocio
+
+Clinicas de Pilates e Fisioterapia frequentemente enfrentam os seguintes gargalos:
+
+- Dados espalhados em ferramentas diferentes (agenda, planilha, WhatsApp, anotacoes locais).
+- Falta de rastreabilidade sobre cancelamentos, no-show e remarcacoes.
+- Dificuldade em controlar mensalidades, planos e recebimentos recorrentes.
+- Ausencia de indicadores confiaveis para tomada de decisao da gestao.
+- Dependencia de processos manuais para orcamentos e comunicacao entre equipes.
+
+Impactos diretos:
+
+- perda de receita,
+- baixa produtividade de recepcao,
+- experiencia inconsistente para cliente,
+- visibilidade limitada para crescimento sustentavel.
+
+## Solucoes Entregues pelo LatesOS
+
+O sistema resolve esses pontos com uma arquitetura orientada a dominio clinico:
+
+- **Fonte unica de verdade** para clientes, profissionais, agenda e financeiro.
+- **Agenda inteligente** com validacoes de conflito, remarcacao e cancelamento tipado.
+- **Financeiro recorrente** com status de mensalidade/plano e baixa automatica de pagamento.
+- **Relatorios gerenciais** de eficiencia por profissional e auditoria de abertura de agendamento.
+- **Orcamento em PDF** padronizado para acelerar fechamento comercial.
+- **Eventos assincronos** via Kafka para evolucao de notificacoes e integracoes.
+
+## Arquitetura da Plataforma
+
+```mermaid
+flowchart LR
+    FE[Frontend Angular] -->|JWT| API[Backend NestJS]
+    API --> DB[(PostgreSQL)]
+    API --> KAFKA[(Kafka)]
+    API --> RABBIT[(RabbitMQ - opcional)]
 ```
 
-## Pré-requisitos
+## Fluxo de Agendamentos com Kafka e Banco
 
-- Node.js 20+
-- npm 10+
-- PostgreSQL 14+
-- (Opcional) Docker / Docker Compose
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Usuario (Recepcao/Admin)
+    participant FE as Frontend
+    participant API as Schedulings API
+    participant DB as PostgreSQL
+    participant K as Kafka
+    participant N as Servico de Notificacao
 
-## Como Rodar (Local)
+    U->>FE: Criar agendamento
+    FE->>API: POST /schedulings (JWT)
+    API->>DB: Validar cliente/profissional/disponibilidade
+    API->>DB: Persistir scheduling
+    API->>K: Publicar evento scheduling.created
+    API-->>FE: Retorna agendamento criado
+    K-->>N: Entrega evento para processamento assincrono
+    N->>N: Envio de notificacoes / automacoes
+```
 
-### 1) Banco e serviços de infraestrutura
+## Modelo de Dados Principal
 
-Opção A (Docker):
+```mermaid
+erDiagram
+    USERS ||--o| CLIENTS : "perfil cliente"
+    USERS ||--o| PROFESSIONALS : "perfil profissional"
+    USERS ||--o{ SCHEDULINGS : "createdBy"
+
+    CLIENTS ||--o{ SCHEDULINGS : "possui"
+    PROFESSIONALS ||--o{ SCHEDULINGS : "atende"
+    PROFESSIONALS ||--o{ AVAILABILITIES : "define"
+
+    CLIENTS ||--o{ CLIENT_BILLINGS : "gera recorrencia"
+    CLIENTS ||--o{ FINANCIAL_TRANSACTIONS : "referencia"
+
+    USERS {
+      uuid id PK
+      string name
+      string email UK
+      string passwordHash
+      enum role
+      bool isActive
+      datetime createdAt
+    }
+
+    CLIENTS {
+      uuid id PK
+      uuid userId FK
+      enum plan
+      int creditsRemaining
+      date birthDate
+      string emergencyContact
+      text anamnesis
+    }
+
+    PROFESSIONALS {
+      uuid id PK
+      uuid userId FK
+      string specialty
+      string bio
+    }
+
+    AVAILABILITIES {
+      uuid id PK
+      uuid professionalId FK
+      enum dayOfWeek
+      time startTime
+      time endTime
+      int maxConcurrentClients
+    }
+
+    SCHEDULINGS {
+      uuid id PK
+      uuid clientId FK
+      uuid professionalId FK
+      uuid createdById FK
+      datetime startAt
+      datetime endAt
+      enum status
+      enum cancellationType
+      string cancellationReason
+      string notes
+    }
+
+    FINANCIAL_TRANSACTIONS {
+      uuid id PK
+      uuid clientId FK
+      string description
+      numeric amount
+      enum type
+      enum paymentMethod
+      enum cardBrand
+      int installments
+      string category
+      datetime occurredAt
+    }
+
+    CLIENT_BILLINGS {
+      uuid id PK
+      uuid clientId FK
+      enum cycle
+      date referencePeriod
+      date dueDate
+      enum status
+      numeric amount
+      datetime paidAt
+    }
+```
+
+## Modulos do Sistema
+
+- **Auth**
+  - Login, refresh token e logout.
+  - Controle por perfis (`ADMIN`, `RECEPTIONIST`, `PROFESSIONAL`, `CLIENT`).
+- **Clientes**
+  - CRUD completo, plano, creditos e anamnese.
+  - Busca e manutencao de dados clinicos.
+- **Profissionais**
+  - CRUD, especialidades e disponibilidade semanal.
+  - Base para calculo de slots disponiveis.
+- **Agenda**
+  - Criacao, remarcacao, conclusao e cancelamento com motivo.
+  - Regras para evitar conflito e horario invalido.
+- **Financeiro**
+  - Entradas/saidas e dashboard de fluxo.
+  - Assinaturas recorrentes (mensal, trimestral, anual).
+- **Relatorios**
+  - Eficiencia por profissional.
+  - Auditoria de abertura e resultado dos agendamentos.
+- **Servicos e Orcamento**
+  - Catalogo de servicos.
+  - Geracao de orcamento em PDF.
+
+## Tecnologias
+
+### Backend
+
+- NestJS 11
+- TypeORM
+- PostgreSQL
+- JWT
+- Kafka
+- RabbitMQ (habilitavel)
+- Swagger/OpenAPI
+
+### Frontend
+
+- Angular 21 (standalone)
+- TypeScript
+- SCSS
+- RxJS
+
+## Como Executar Localmente
+
+### 1) Infraestrutura
+
+Opcional com Docker:
 
 ```bash
 docker compose up -d postgres rabbitmq kafka
 ```
-
-Opção B (manual):
-
-- Suba PostgreSQL local.
-- Ajuste `backend/.env` com `DATABASE_URL`.
 
 ### 2) Backend
 
@@ -60,7 +257,8 @@ npm run migration:run
 npm run start:dev
 ```
 
-API padrão: `http://localhost:3000`
+API: `http://localhost:3000`  
+Swagger: `http://localhost:3000/api`
 
 ### 3) Frontend
 
@@ -70,37 +268,47 @@ npm install
 npm run start
 ```
 
-App padrão: `http://localhost:4200`
+Aplicacao: `http://localhost:4200`
 
-## Login inicial
+## Ambientes e Configuracoes
 
-O seed usa credenciais vindas do `.env` do backend:
+Variaveis sensiveis ficam no `.env` do backend.
 
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-
-Exemplo comum no projeto:
+Credenciais seed padrao (conforme ambiente local):
 
 - Email: `admin@pilatesos.com`
 - Senha: `admin123`
 
+Marca visual:
 
-## Scripts úteis
+- `frontend/public/assets/logo.png`
 
-### Backend
+## Qualidade e Observabilidade
 
-- `npm run start:dev`
-- `npm run build`
-- `npm run migration:run`
-- `npm run test`
+- Validacao de entrada com `class-validator`.
+- Interceptor global para padronizacao de resposta.
+- Estrutura preparada para evoluir monitoramento (logs, metricas e alertas).
+- Testes unitarios presentes em modulos criticos (ex.: seeds e agenda).
 
-### Frontend
+## Seguranca
 
-- `npm run start`
-- `npm run build`
-- `npm run test`
+- Autenticacao JWT com refresh token.
+- Guardas por role para controle de autorizacao.
+- CORS configuravel por ambiente.
+- Recomendado para producao:
+  - rotacao de segredos,
+  - HTTPS,
+  - rate limit,
+  - politicas de backup e restore.
 
-## Documentação por app
+## Roadmap Tecnico
+
+- Cobertura E2E dos fluxos criticos.
+- Integração de gateway de pagamento.
+- Observabilidade completa (tracing, dashboards e alertas).
+- Politicas de governanca de dados (LGPD, auditoria ampliada).
+
+## Documentacao Complementar
 
 - [Backend README](./backend/README.md)
 - [Frontend README](./frontend/README.md)

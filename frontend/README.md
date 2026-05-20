@@ -1,59 +1,102 @@
-# Frontend
+﻿# LatesOS Frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.11.
+Interface web do LatesOS construída com Angular.
 
-## Development server
+## Stack
 
-To start a local development server, run:
+- Angular 21 (standalone)
+- TypeScript
+- SCSS
+- RxJS
 
-```bash
-ng serve
+## Módulos de tela
+
+- `login`
+- `dashboard`
+- `clients`
+- `professionals`
+- `scheduling`
+- `reports`
+- `finance`
+- `services`
+
+## Estrutura resumida
+
+```text
+src/
+├── app/
+│   ├── core/
+│   │   ├── auth/
+│   │   ├── http/
+│   │   ├── models/
+│   │   └── theme/
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── clients/
+│   │   ├── professionals/
+│   │   ├── scheduling/
+│   │   ├── reports/
+│   │   ├── finance/
+│   │   └── services/
+│   ├── shared/
+│   ├── app.routes.ts
+│   └── app.ts
+├── styles.scss
+└── index.html
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Executando
 
 ```bash
-ng generate component component-name
+npm install
+npm run start
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Aplicação em: `http://localhost:4200`
+
+## Build de produção
 
 ```bash
-ng generate --help
+npm run build
 ```
 
-## Building
+Saída: `dist/frontend`
 
-To build the project run:
+## Integração com API
 
-```bash
-ng build
-```
+- URL base atual: `http://localhost:3000` (definida em `src/app/core/http/api.service.ts`).
+- Requisições autenticadas usam interceptor JWT.
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Login
 
-## Running unit tests
+Credenciais padrão dependem do seed do backend (`ADMIN_EMAIL` e `ADMIN_PASSWORD`).
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+Exemplo comum:
 
-```bash
-ng test
-```
+- `admin@pilatesos.com`
+- `admin123`
 
-## Running end-to-end tests
+## Branding
 
-For end-to-end (e2e) testing, run:
+Arquivo padrão de marca:
 
-```bash
-ng e2e
-```
+- `public/assets/logo.png`
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Utilizado em:
 
-## Additional Resources
+- Favicon
+- Tela de login
+- Sidebar principal
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Scripts
+
+- `npm run start` inicia servidor de desenvolvimento.
+- `npm run build` gera build de produção.
+- `npm run test` roda testes.
+
+## Boas práticas no projeto
+
+- Preferir componentes standalone.
+- Manter tipagem via `core/models/domain.models.ts`.
+- Centralizar chamadas REST em `core/http/api.service.ts`.
+- Evitar lógica de negócio pesada nos templates.

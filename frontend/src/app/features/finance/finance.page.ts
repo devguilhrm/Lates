@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -114,7 +114,12 @@ interface CardBrandOption {
                     {{ subscriptionStatusLabel(item.status) }}
                   </span>
                 </td>
-                <td>{{ item.lastPaymentAt ? (item.lastPaymentAt | date: 'dd/MM HH:mm') : '-' }}</td>
+                <td>
+                  {{ item.lastPaymentAt ? (item.lastPaymentAt | date: 'dd/MM HH:mm') : '-' }}
+                  @if (item.lastPaymentTransactionId) {
+                    <small class="muted">#{{ item.lastPaymentTransactionId }}</small>
+                  }
+                </td>
                 <td>
                   <button
                     class="primary-button"
@@ -140,6 +145,12 @@ interface CardBrandOption {
             Cliente: {{ selectedSubscription()?.clientName }} |
             Plano: {{ planLabel(selectedSubscription()?.plan || 'MONTHLY') }}
           </p>
+          @if (subscriptionPaymentError()) {
+            <p class="error">{{ subscriptionPaymentError() }}</p>
+          }
+          @if (subscriptionPaymentSuccess()) {
+            <p class="positive">{{ subscriptionPaymentSuccess() }}</p>
+          }
           <form class="grid cols-3" [formGroup]="subscriptionPaymentForm" (ngSubmit)="submitSubscriptionPayment()">
             <label class="field">
               <span>Descricao</span>
@@ -309,6 +320,7 @@ interface CardBrandOption {
       </section>
 
       <section class="panel">
+        <a id="lancamentos"></a>
         <div class="toolbar list-header">
           <h3>Lancamentos</h3>
           <label class="field compact-field">
@@ -443,6 +455,7 @@ export class FinancePage {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly document = inject(DOCUMENT);
 
   protected readonly billingPresets: BillingPreset[] = [
     {
@@ -519,6 +532,8 @@ export class FinancePage {
   protected readonly saving = signal(false);
   protected readonly subscriptionError = signal('');
   protected readonly selectedSubscription = signal<SubscriptionBillingItem | null>(null);
+  protected readonly subscriptionPaymentError = signal('');
+  protected readonly subscriptionPaymentSuccess = signal('');
   protected readonly incomePresets = signal<BillingPreset[]>(
     this.billingPresets.filter((preset) => preset.type === 'INCOME'),
   );
@@ -609,6 +624,8 @@ export class FinancePage {
 
   protected openSubscriptionPaymentModal(item: SubscriptionBillingItem): void {
     this.selectedSubscription.set(item);
+    this.subscriptionPaymentError.set('');
+    this.subscriptionPaymentSuccess.set('');
     this.subscriptionPaymentForm.patchValue({
       description: `Mensalidade - ${item.clientName}`,
       amount: item.amount ?? this.defaultAmountByPlan(item.plan),
@@ -622,6 +639,8 @@ export class FinancePage {
 
   protected closeSubscriptionPaymentModal(): void {
     this.selectedSubscription.set(null);
+    this.subscriptionPaymentError.set('');
+    this.subscriptionPaymentSuccess.set('');
   }
 
   protected submitSubscriptionPayment(): void {
@@ -629,23 +648,41 @@ export class FinancePage {
     if (!item || this.subscriptionPaymentForm.invalid) return;
 
     const payload = this.subscriptionPaymentForm.getRawValue();
+    this.subscriptionPaymentError.set('');
+    this.subscriptionPaymentSuccess.set('');
     this.saving.set(true);
     this.api
       .post(`/finance/subscriptions/${item.clientId}/pay`, {
         description: payload.description,
-        amount: payload.amount,
+        amount: Number(payload.amount),
         paymentMethod: payload.paymentMethod,
         cardBrand: payload.paymentMethod === 'CREDIT_CARD' ? payload.cardBrand : undefined,
         installments: payload.paymentMethod === 'CREDIT_CARD' ? payload.installments : undefined,
         occurredAt: this.toIsoFromLocal(payload.occurredAt),
       })
       .subscribe({
-        next: () => {
+        next: (response: unknown) => {
           this.saving.set(false);
-          this.closeSubscriptionPaymentModal();
+          const asRecord = response as { transaction?: FinancialTransaction } | null;
+          const tx = asRecord?.transaction;
+          const txId = tx?.id;
+          this.subscriptionPaymentSuccess.set(
+            txId
+              ? `Pagamento registrado com sucesso. Lancamento: ${txId}.`
+              : 'Pagamento registrado com sucesso e enviado para lancamentos.',
+          );
           this.applyFilters();
+          if (tx) this.redirectToTransactions(tx);
         },
-        error: () => this.saving.set(false),
+        error: (error) => {
+          const message = error?.error?.message;
+          this.subscriptionPaymentError.set(
+            Array.isArray(message)
+              ? message.join(' | ')
+              : message || 'Nao foi possivel registrar o pagamento da mensalidade.',
+          );
+          this.saving.set(false);
+        },
       });
   }
 
@@ -679,11 +716,12 @@ export class FinancePage {
         occurredAt: payload.occurredAt,
       })
       .subscribe({
-        next: () => {
+        next: (transaction) => {
           this.saving.set(false);
           this.transactionForm.patchValue({ occurredAt: this.todayDate() });
           this.applyPreset(payload.billingPresetId);
           this.applyFilters();
+          this.redirectToTransactions(transaction);
         },
         error: () => this.saving.set(false),
       });
@@ -840,5 +878,28 @@ export class FinancePage {
   private toIsoFromLocal(local: string): string {
     const date = new Date(local);
     return date.toISOString();
+  }
+
+  private redirectToTransactions(transaction: FinancialTransaction): void {
+    this.typeFilter.set('');
+    this.adjustPeriodToTransaction(transaction.occurredAt);
+    this.loadTransactions();
+    setTimeout(() => {
+      this.document.getElementById('lancamentos')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 60);
+  }
+
+  private adjustPeriodToTransaction(occurredAt: string): void {
+    const txDate = new Date(occurredAt);
+    if (Number.isNaN(txDate.getTime())) return;
+    const start = new Date(txDate.getFullYear(), txDate.getMonth(), 1);
+    const end = new Date(txDate.getFullYear(), txDate.getMonth() + 1, 0);
+    this.periodForm.patchValue({
+      startDate: this.toDateInput(start),
+      endDate: this.toDateInput(end),
+    });
   }
 }

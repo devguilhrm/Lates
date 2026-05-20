@@ -1,43 +1,43 @@
 :host {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 17rem minmax(0, 1fr);
+  display: block;
   color: var(--text);
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 17.5rem minmax(0, 1fr);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 1.2rem;
-  background: var(--sidebar);
+  overflow-y: auto;
+  padding: 1.2rem 1rem;
+  background: color-mix(in srgb, var(--surface) 90%, var(--background-soft));
   border-right: 1px solid var(--line);
+  z-index: 30;
 }
 
 .brand {
   display: flex;
-  gap: 0.75rem;
   align-items: center;
-  margin-bottom: 1.5rem;
+  justify-content: center;
+  margin-bottom: 1.35rem;
+  padding: 0.55rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--surface-strong) 85%, transparent);
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 2.35rem;
-  height: 2.35rem;
-  border-radius: 0.65rem;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 800;
-}
-
-.brand strong,
-.brand small {
+.brand-logo {
+  width: min(100%, 11.5rem);
+  height: 3.1rem;
+  object-fit: contain;
   display: block;
 }
 
-.brand small,
 .eyebrow {
   color: var(--muted);
   font-size: 0.78rem;
@@ -51,20 +51,35 @@ nav {
 nav a {
   color: var(--muted);
   text-decoration: none;
-  padding: 0.78rem 0.9rem;
-  border-radius: 0.5rem;
+  padding: 0.72rem 0.85rem;
+  border-radius: 0.6rem;
   font-weight: 700;
+  border: 1px solid transparent;
+  position: relative;
 }
 
 nav a.active,
 nav a:hover {
   color: var(--text);
   background: var(--surface-strong);
+  border-color: var(--line);
+}
+
+nav a.active::after {
+  content: '';
+  position: absolute;
+  left: 0.45rem;
+  right: 0.45rem;
+  bottom: 0.35rem;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  opacity: 0.45;
 }
 
 .workspace {
   min-width: 0;
-  background: var(--background);
+  background: transparent;
 }
 
 .topbar {
@@ -72,65 +87,128 @@ nav a:hover {
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
-  padding: 1.15rem 1.5rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--background) 92%, transparent);
-  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--background) 84%, transparent);
+  backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 20;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 h1 {
-  margin: 0.15rem 0 0;
-  font-size: 1.05rem;
+  margin: 0.16rem 0 0;
+  font-size: 1.03rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .actions {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.55rem;
   align-items: center;
 }
 
+.menu-button,
 .icon-button,
 .ghost-button {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
   min-height: 2.35rem;
-  border-radius: 0.5rem;
-  padding: 0 0.8rem;
+  border-radius: 0.6rem;
+  padding: 0 0.82rem;
   font-weight: 800;
   cursor: pointer;
 }
 
+.menu-button,
 .icon-button {
   width: 2.35rem;
   padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.menu-button {
+  display: none;
 }
 
 .content {
-  padding: 1.5rem;
+  padding: 1.45rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-@media (max-width: 860px) {
-  :host {
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .shell {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: static;
-    height: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .menu-button {
+    display: grid;
   }
 
-  nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    opacity: 0;
+    visibility: hidden;
+    border: 0;
+    background: rgba(4, 9, 18, 0.45);
+    transition: opacity 180ms ease;
+  }
+
+  .sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: min(18.2rem, 88vw);
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+    box-shadow: var(--shadow-strong);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .brand-logo {
+    width: min(100%, 10.25rem);
+    height: 2.8rem;
   }
 
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    padding: 0.9rem 1rem;
+  }
+
+  h1 {
+    white-space: normal;
+    font-size: 0.93rem;
+  }
+
+  .content {
+    padding: 1rem;
   }
 }

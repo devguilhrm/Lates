@@ -84,17 +84,6 @@ Exemplo comum no projeto:
 - Email: `admin@pilatesos.com`
 - Senha: `admin123`
 
-## Branding (logo e favicon)
-
-Arquivo de logo padrão:
-
-- `frontend/public/assets/logo.png`
-
-Esse arquivo é utilizado em:
-
-- Favicon
-- Tela de login
-- Painel lateral
 
 ## Scripts úteis
 
@@ -110,23 +99,6 @@ Esse arquivo é utilizado em:
 - `npm run start`
 - `npm run build`
 - `npm run test`
-
-## Convenção de commits (Conventional Commits)
-
-Padrão recomendado:
-
-- `feat(scope): descrição`
-- `fix(scope): descrição`
-- `docs(scope): descrição`
-- `refactor(scope): descrição`
-- `test(scope): descrição`
-- `chore(scope): descrição`
-
-Exemplos:
-
-- `feat(finance): add recurring subscription billing endpoints`
-- `fix(services): generate valid quote pdf stream`
-- `docs(readme): document setup for backend and frontend`
 
 ## Documentação por app
 

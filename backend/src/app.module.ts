@@ -4,7 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { Availability, Client, Professional, Scheduling, User } from './database/entities';
+import { Availability, Client, ClientBilling, FinancialTransaction, Professional, Scheduling, User } from './database/entities';
 import { SchedulingsModule } from './modules/schedulings/schedulings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -12,6 +12,8 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
 import { HealthModule } from './modules/health/health.module';
 import { SeedsModule } from './modules/seeds/seeds.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { ServicesModule } from './modules/services/services.module';
 
 const queueImports =
   process.env.QUEUES_ENABLED === 'false'
@@ -38,7 +40,7 @@ const queueImports =
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: config.get<string>('DB_SYNC') === 'true',
-        entities: [User, Client, Professional, Availability, Scheduling],
+        entities: [User, Client, Professional, Availability, Scheduling, FinancialTransaction, ClientBilling],
       }),
     }),
     ...queueImports,
@@ -47,6 +49,8 @@ const queueImports =
     SeedsModule,
     ClientsModule,
     ProfessionalsModule,
+    FinanceModule,
+    ServicesModule,
     SchedulingsModule,
     NotificationsModule,
   ],

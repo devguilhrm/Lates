@@ -5,6 +5,7 @@ export type CancellationType = 'CLIENT_CANCELLED' | 'PROFESSIONAL_CANCELLED' | '
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 export type FinancialTransactionType = 'INCOME' | 'EXPENSE';
 export type PaymentMethod = 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD';
+export type PaymentChannel = 'APP_QR' | 'STORE_TERMINAL';
 export type CardBrand = 'VISA' | 'MASTERCARD' | 'ELO' | 'HIPERCARD' | 'AMEX';
 export type SubscriptionBillingStatus = 'PENDING' | 'OVERDUE' | 'PAID' | 'NOT_APPLICABLE';
 export type SubscriptionBillingCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | null;
@@ -117,6 +118,18 @@ export interface SubscriptionBillingItem {
   dueDate?: string | null;
   amount?: number | null;
   lastPaymentAt?: string | null;
+  lastPaymentTransactionId?: string | null;
+}
+
+export interface MySubscriptionBilling {
+  billingId: string;
+  plan: PlanType;
+  cycle: Exclude<SubscriptionBillingCycle, null>;
+  referencePeriod: string;
+  dueDate: string;
+  status: Exclude<SubscriptionBillingStatus, 'NOT_APPLICABLE'>;
+  amount: number;
+  creditsRemaining: number;
 }
 
 export interface ServiceCatalogItem {

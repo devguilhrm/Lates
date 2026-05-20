@@ -1,41 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap');
+
 * {
   box-sizing: border-box;
 }
 
 :root {
   color-scheme: light;
-  --background: #f4f7f6;
-  --sidebar: #ffffff;
+  --background: #f5f7f9;
+  --background-soft: #eef2f6;
   --surface: #ffffff;
-  --surface-strong: #e8f1ef;
-  --text: #17211f;
-  --muted: #62706d;
-  --line: #d9e3e0;
-  --accent: #0f766e;
-  --accent-strong: #115e59;
-  --danger: #b91c1c;
-  font-family: Avenir Next, Segoe UI, sans-serif;
+  --surface-strong: #f0f4f8;
+  --text: #18222f;
+  --muted: #64748b;
+  --line: #d7dee8;
+  --accent: #0e7490;
+  --accent-strong: #155e75;
+  --danger: #b42318;
+  --success: #13795b;
+  --ring: rgba(14, 116, 144, 0.2);
+  --shadow-soft: 0 8px 22px rgba(17, 24, 39, 0.06);
+  --shadow-strong: 0 24px 52px rgba(15, 23, 42, 0.14);
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --background: #111816;
-  --sidebar: #0c1211;
-  --surface: #17211f;
-  --surface-strong: #21312e;
-  --text: #edf7f4;
-  --muted: #9fb0ac;
-  --line: #2b3d39;
-  --accent: #14b8a6;
-  --accent-strong: #2dd4bf;
-  --danger: #f87171;
+  --background: #0d131a;
+  --background-soft: #151d27;
+  --surface: #141f2b;
+  --surface-strong: #1b2a39;
+  --text: #e6edf6;
+  --muted: #9eb0c5;
+  --line: #27384b;
+  --accent: #22a5c9;
+  --accent-strong: #43bfdc;
+  --danger: #ff6b63;
+  --success: #4ade80;
+  --ring: rgba(34, 165, 201, 0.28);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-strong: 0 28px 56px rgba(0, 0, 0, 0.45);
 }
 
 html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--background);
+  background:
+    radial-gradient(circle at 10% 5%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 34%),
+    radial-gradient(circle at 95% 12%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 30%),
+    var(--background);
+  color: var(--text);
 }
 
 body,
@@ -46,17 +60,25 @@ textarea {
   font: inherit;
 }
 
+h1,
+h2,
+h3,
+strong {
+  font-family: 'Sora', 'Manrope', sans-serif;
+  letter-spacing: -0.015em;
+}
+
 button,
 a,
 input,
 select,
 textarea {
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .page {
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .page-header {
@@ -68,7 +90,7 @@ textarea {
 
 .page-header h2 {
   margin: 0;
-  font-size: 1.55rem;
+  font-size: clamp(1.35rem, 2vw, 1.65rem);
 }
 
 .page-header p {
@@ -79,8 +101,10 @@ textarea {
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0.85rem;
   padding: 1rem;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .toolbar {
@@ -101,7 +125,8 @@ textarea {
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table th,
@@ -112,10 +137,15 @@ textarea {
   vertical-align: middle;
 }
 
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+}
+
 .table th {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .field {
@@ -125,19 +155,33 @@ textarea {
 
 .field span {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
-input,
+input:not([type='checkbox']):not([type='radio']),
 select,
 textarea {
   width: 100%;
   color: var(--text);
-  background: var(--background);
+  background: var(--background-soft);
   border: 1px solid var(--line);
-  border-radius: 0.45rem;
+  border-radius: 0.6rem;
   padding: 0.72rem 0.78rem;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  box-shadow: 0 0 0 4px var(--ring);
 }
 
 textarea {
@@ -149,11 +193,12 @@ textarea {
 .secondary-button,
 .danger-button {
   border: 0;
-  border-radius: 0.45rem;
+  border-radius: 0.6rem;
   min-height: 2.55rem;
-  padding: 0 0.9rem;
+  padding: 0 1rem;
   font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .primary-button {
@@ -161,9 +206,25 @@ textarea {
   color: #fff;
 }
 
+.primary-button:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.primary-button:active,
+.secondary-button:active,
+.danger-button:active {
+  transform: translateY(0);
+}
+
 .secondary-button {
   color: var(--text);
   background: var(--surface-strong);
+  border: 1px solid var(--line);
+}
+
+.secondary-button:hover {
+  transform: translateY(-1px);
 }
 
 .danger-button {
@@ -176,6 +237,7 @@ textarea {
 .danger-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
 }
 
 .metric {
@@ -184,7 +246,11 @@ textarea {
 }
 
 .metric strong {
-  font-size: 2rem;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.page-header + .grid .metric {
+  min-height: 5.5rem;
 }
 
 .muted {
@@ -196,7 +262,7 @@ textarea {
   font-weight: 700;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 980px) {
   .page-header {
     align-items: stretch;
     flex-direction: column;

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import {
   FinancialTransactionType,
+  PaymentChannel,
   PaymentMethod,
   SchedulingStatus,
   SubscriptionBillingCycle,
@@ -18,6 +19,16 @@ import { RegisterSubscriptionPaymentDto } from './dto/register-subscription-paym
 
 type FinanceTransactionView = Omit<FinancialTransaction, 'amount'> & { amount: number };
 type SubscriptionViewStatus = SubscriptionBillingStatus | 'NOT_APPLICABLE';
+type ClientSubscriptionBillingView = {
+  billingId: string;
+  plan: Client['plan'];
+  cycle: SubscriptionBillingCycle;
+  referencePeriod: string;
+  dueDate: string;
+  status: SubscriptionBillingStatus;
+  amount: number;
+  creditsRemaining: number;
+};
 
 @Injectable()
 export class FinanceService {
@@ -254,7 +265,7 @@ export class FinanceService {
     const billings = clientIds.length
       ? await this.clientBillingsRepo.find({
           where: clientIds.map((clientId) => ({ client: { id: clientId } })),
-          relations: { client: true },
+          relations: { client: true, paymentTransaction: true },
           order: { dueDate: 'DESC' },
         })
       : [];
@@ -297,6 +308,7 @@ export class FinanceService {
           dueDate: currentBilling?.dueDate ?? null,
           amount: currentBilling ? this.parseNumber(currentBilling.amount) : null,
           lastPaymentAt: paidBilling?.paidAt ?? null,
+          lastPaymentTransactionId: paidBilling?.paymentTransaction?.id ?? null,
         };
       })
       .filter((item) => (query.status ? item.status === query.status : true));
@@ -368,6 +380,7 @@ export class FinanceService {
     billing.status = SubscriptionBillingStatus.PAID;
     billing.paidAt = now;
     billing.amount = amount.toFixed(2);
+    billing.paymentTransaction = transaction;
     await this.clientBillingsRepo.save(billing);
 
     return {
@@ -379,6 +392,117 @@ export class FinanceService {
         amount: this.parseNumber(billing.amount),
       },
       transaction: this.mapTransaction(transaction),
+    };
+  }
+
+  async listMySubscriptions(userId: string) {
+    await this.subscriptionBillingService.ensureRecurringBillings(new Date());
+    const client = await this.findClientByUserId(userId);
+    const cycle = this.subscriptionBillingService.planToCycle(client.plan);
+    if (!cycle) return { items: [] as ClientSubscriptionBillingView[] };
+
+    const billings = await this.clientBillingsRepo.find({
+      where: { client: { id: client.id }, cycle },
+      relations: { client: true },
+      order: { dueDate: 'DESC' },
+      take: 12,
+    });
+
+    return {
+      items: billings.map((billing) => ({
+        billingId: billing.id,
+        plan: client.plan,
+        cycle,
+        referencePeriod: billing.referencePeriod,
+        dueDate: billing.dueDate,
+        status: billing.status,
+        amount: this.parseNumber(billing.amount),
+        creditsRemaining: client.creditsRemaining,
+      })),
+    };
+  }
+
+  async generateMySubscriptionPaymentCode(
+    userId: string,
+    billingId: string,
+    paymentMethod: PaymentMethod = PaymentMethod.PIX,
+    paymentChannel: PaymentChannel = PaymentChannel.APP_QR,
+  ) {
+    const { client, billing } = await this.resolveClientOwnedBilling(userId, billingId);
+
+    if (billing.status === SubscriptionBillingStatus.PAID) {
+      throw new BadRequestException('Mensalidade deste periodo ja esta em dia.');
+    }
+
+    const paymentCode = this.generatePaymentCode(billing, paymentMethod, paymentChannel);
+    const qrCodePayload = paymentMethod === PaymentMethod.PIX ? `PIX|${paymentCode}` : null;
+
+    return {
+      billing: {
+        id: billing.id,
+        dueDate: billing.dueDate,
+        status: billing.status,
+        amount: this.parseNumber(billing.amount),
+      },
+      client: {
+        id: client.id,
+        name: client.user.name,
+        creditsRemaining: client.creditsRemaining,
+      },
+      payment: {
+        paymentMethod,
+        paymentChannel,
+        paymentCode,
+        qrCodePayload,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      },
+    };
+  }
+
+  async payMySubscriptionByBillingId(
+    userId: string,
+    billingId: string,
+    dto: RegisterSubscriptionPaymentDto,
+  ) {
+    const { client, billing } = await this.resolveClientOwnedBilling(userId, billingId);
+    if (billing.status === SubscriptionBillingStatus.PAID) {
+      throw new BadRequestException('Mensalidade deste periodo ja esta em dia.');
+    }
+
+    const now = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
+    const amount = dto.amount ?? this.parseNumber(billing.amount);
+    const transaction = await this.saveTransaction({
+      description:
+        dto.description?.trim() ||
+        `${this.cycleLabel(billing.cycle)} - ${client.user.name}`,
+      amount,
+      paymentMethod: dto.paymentMethod,
+      cardBrand: dto.cardBrand,
+      installments: dto.installments,
+      category: this.cycleCategory(billing.cycle),
+      occurredAt: now,
+      type: FinancialTransactionType.INCOME,
+      client,
+    });
+
+    billing.status = SubscriptionBillingStatus.PAID;
+    billing.paidAt = now;
+    billing.amount = amount.toFixed(2);
+    billing.paymentTransaction = transaction;
+    await this.clientBillingsRepo.save(billing);
+
+    return {
+      billing: {
+        id: billing.id,
+        status: billing.status,
+        dueDate: billing.dueDate,
+        paidAt: billing.paidAt,
+        amount: this.parseNumber(billing.amount),
+      },
+      transaction: this.mapTransaction(transaction),
+      metadata: {
+        paymentChannel: dto.paymentChannel ?? PaymentChannel.APP_QR,
+      },
     };
   }
 
@@ -403,6 +527,38 @@ export class FinanceService {
 
   private mapTransaction(item: FinancialTransaction): FinanceTransactionView {
     return { ...item, amount: this.parseNumber(item.amount) };
+  }
+
+  private async findClientByUserId(userId: string): Promise<Client> {
+    const client = await this.clientsRepo.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+    if (!client) throw new BadRequestException('Perfil de cliente nao encontrado para o usuario.');
+    return client;
+  }
+
+  private async resolveClientOwnedBilling(userId: string, billingId: string) {
+    const client = await this.findClientByUserId(userId);
+    const billing = await this.clientBillingsRepo.findOne({
+      where: { id: billingId, client: { id: client.id } },
+      relations: { client: true },
+    });
+
+    if (!billing) {
+      throw new BadRequestException('Cobranca de mensalidade nao encontrada para este cliente.');
+    }
+
+    return { client, billing };
+  }
+
+  private generatePaymentCode(
+    billing: ClientBilling,
+    method: PaymentMethod,
+    channel: PaymentChannel,
+  ): string {
+    const suffix = Math.random().toString(36).slice(2, 10).toUpperCase();
+    return `LTS-${billing.id.slice(0, 8).toUpperCase()}-${method}-${channel}-${suffix}`;
   }
 
   private async saveTransaction(params: {

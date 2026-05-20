@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { CardBrand, PaymentMethod } from '../../../common/enums';
+import { CardBrand, PaymentChannel, PaymentMethod } from '../../../common/enums';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterSubscriptionPaymentDto {
@@ -47,4 +47,23 @@ export class RegisterSubscriptionPaymentDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentChannel,
+    example: PaymentChannel.APP_QR,
+    description: 'Canal de recebimento: app do cliente (QR) ou maquininha da loja.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentChannel)
+  paymentChannel?: PaymentChannel;
+
+  @ApiPropertyOptional({
+    example: 'tok_test_123456',
+    description:
+      'Token de cartao gerado no frontend por gateway externo. Nao enviar numero bruto do cartao.',
+  })
+  @ValidateIf((dto: RegisterSubscriptionPaymentDto) => dto.paymentMethod === PaymentMethod.CREDIT_CARD)
+  @IsString()
+  @IsOptional()
+  cardToken?: string;
 }

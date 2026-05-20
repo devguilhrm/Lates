@@ -40,6 +40,11 @@ export enum PaymentMethod {
   DEBIT_CARD = 'DEBIT_CARD',
 }
 
+export enum PaymentChannel {
+  APP_QR = 'APP_QR',
+  STORE_TERMINAL = 'STORE_TERMINAL',
+}
+
 export enum CardBrand {
   VISA = 'VISA',
   MASTERCARD = 'MASTERCARD',

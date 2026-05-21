@@ -290,6 +290,13 @@ Marca visual:
 - Estrutura preparada para evoluir monitoramento (logs, metricas e alertas).
 - Testes unitarios presentes em modulos criticos (ex.: seeds e agenda).
 
+## Testes Automatizados
+
+- Backend: `cd backend && npm run test:ci`
+- Frontend: `cd frontend && npm run test:ci`
+- Mobile: `cd mobile-app && npm run test:ci`
+- Suite completa (todos os projetos): `powershell -ExecutionPolicy Bypass -File .\scripts\run-all-tests.ps1`
+
 ## Seguranca
 
 - Autenticacao JWT com refresh token.

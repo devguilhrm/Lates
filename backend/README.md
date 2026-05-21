@@ -89,6 +89,7 @@ Swagger: `http://localhost:3000/api`
 - `npm run migration:run` aplica migrations.
 - `npm run migration:revert` reverte última migration.
 - `npm run test` executa testes.
+- `npm run test:ci` executa testes em modo CI.
 
 ## Endpoints principais
 

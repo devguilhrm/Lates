@@ -93,6 +93,7 @@ Utilizado em:
 - `npm run start` inicia servidor de desenvolvimento.
 - `npm run build` gera build de produção.
 - `npm run test` roda testes.
+- `npm run test:ci` roda testes em modo CI (sem watch).
 
 ## Boas práticas no projeto
 

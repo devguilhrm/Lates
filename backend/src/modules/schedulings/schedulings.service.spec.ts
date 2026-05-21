@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
-import { CancellationType, UserRole } from '../../common/enums';
+import { CancellationType, DayOfWeek, UserRole } from '../../common/enums';
 import { Availability, Client, Professional, Scheduling, User } from '../../database/entities';
 import { SubscriptionBillingService } from '../billing/subscription-billing.service';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
@@ -23,6 +23,28 @@ function createConflictQueryBuilder(conflict: object | null) {
     getCount: jest.fn().mockResolvedValue(0),
     getOne: jest.fn().mockResolvedValue(conflict),
   };
+}
+
+function dayOfWeekFromDate(date: Date): DayOfWeek {
+  const map: DayOfWeek[] = [
+    DayOfWeek.SUN,
+    DayOfWeek.MON,
+    DayOfWeek.TUE,
+    DayOfWeek.WED,
+    DayOfWeek.THU,
+    DayOfWeek.FRI,
+    DayOfWeek.SAT,
+  ];
+  return map[date.getDay()];
+}
+
+function createFutureBusinessSlot() {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(10, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(11, 0, 0, 0);
+  return { start, end };
 }
 
 describe('SchedulingsService', () => {
@@ -143,8 +165,8 @@ describe('SchedulingsService', () => {
   });
 
   it('deve bloquear agendamento quando cliente ficou sem credito e mensalidade nao esta em dia', async () => {
-    const futureStart = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const futureEnd = new Date(futureStart.getTime() + 60 * 60 * 1000);
+    const { start: futureStart, end: futureEnd } = createFutureBusinessSlot();
+    const dayOfWeek = dayOfWeekFromDate(futureStart);
     const client = {
       id: 'client-1',
       creditsRemaining: 0,
@@ -161,7 +183,7 @@ describe('SchedulingsService', () => {
 
     availabilityRepo.find.mockResolvedValue([
       {
-        dayOfWeek: 'WED',
+        dayOfWeek,
         startTime: '08:00',
         endTime: '18:00',
         maxConcurrentClients: 2,
@@ -194,8 +216,8 @@ describe('SchedulingsService', () => {
   });
 
   it('deve debitar credito quando agendamento for criado com sucesso', async () => {
-    const futureStart = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const futureEnd = new Date(futureStart.getTime() + 60 * 60 * 1000);
+    const { start: futureStart, end: futureEnd } = createFutureBusinessSlot();
+    const dayOfWeek = dayOfWeekFromDate(futureStart);
     const client = {
       id: 'client-1',
       creditsRemaining: 4,
@@ -212,7 +234,7 @@ describe('SchedulingsService', () => {
     userRepo.findOne.mockResolvedValue({ id: 'admin-1' } as User);
     availabilityRepo.find.mockResolvedValue([
       {
-        dayOfWeek: 'WED',
+        dayOfWeek,
         startTime: '08:00',
         endTime: '18:00',
         maxConcurrentClients: 2,

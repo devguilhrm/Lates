@@ -20,6 +20,7 @@
     "migration:generate": "npm run typeorm -- migration:generate",
     "dev:no-queues": "cross-env QUEUES_ENABLED=false npm run start:dev",
     "test": "jest",
+    "test:ci": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

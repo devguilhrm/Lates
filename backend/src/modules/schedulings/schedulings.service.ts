@@ -16,10 +16,15 @@ import { TimeSlot } from './dto/time-slot.dto';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { SubscriptionBillingService } from '../billing/subscription-billing.service';
+import { InternalNotificationsService } from '../notifications/internal-notifications.service';
 
 @Injectable()
 export class SchedulingsService {
   private readonly logger = new Logger(SchedulingsService.name);
+  private readonly activeSchedulingStatuses = [
+    SchedulingStatus.SCHEDULED,
+    SchedulingStatus.CHECKED_IN,
+  ];
 
   constructor(
     @InjectRepository(Scheduling)
@@ -34,6 +39,7 @@ export class SchedulingsService {
     private readonly userRepo: Repository<User>,
     private readonly schedulingEventsPublisher: SchedulingEventsPublisher,
     private readonly subscriptionBillingService: SubscriptionBillingService,
+    private readonly internalNotificationsService: InternalNotificationsService,
   ) {}
 
   async checkProfessionalAvailability(
@@ -48,7 +54,9 @@ export class SchedulingsService {
     const concurrentCount = await this.schedulingRepo
       .createQueryBuilder('s')
       .where('s.professionalId = :professionalId', { professionalId })
-      .andWhere('s.status = :status', { status: SchedulingStatus.SCHEDULED })
+      .andWhere('s.status IN (:...activeStatuses)', {
+        activeStatuses: this.activeSchedulingStatuses,
+      })
       .andWhere('s.startAt < :endAt AND s.endAt > :startAt', { startAt, endAt })
       .andWhere(excludeSchedulingId ? 's.id != :excludeId' : '1=1', {
         excludeId: excludeSchedulingId,
@@ -67,7 +75,9 @@ export class SchedulingsService {
     const conflict = await this.schedulingRepo
       .createQueryBuilder('s')
       .where('s.clientId = :clientId', { clientId })
-      .andWhere('s.status = :status', { status: SchedulingStatus.SCHEDULED })
+      .andWhere('s.status IN (:...activeStatuses)', {
+        activeStatuses: this.activeSchedulingStatuses,
+      })
       .andWhere('s.startAt < :endAt AND s.endAt > :startAt', { startAt, endAt })
       .andWhere(excludeSchedulingId ? 's.id != :excludeId' : '1=1', {
         excludeId: excludeSchedulingId,
@@ -130,6 +140,9 @@ export class SchedulingsService {
       professionalName: professional.user.name,
       startAt: created.startAt,
     });
+    if (actor.role === UserRole.CLIENT) {
+      await this.internalNotificationsService.notifyReceptionAboutClientScheduling(created);
+    }
 
     this.logger.log(`Agendamento criado: ${created.id}`);
     return created;
@@ -229,12 +242,62 @@ export class SchedulingsService {
   async complete(id: string): Promise<Scheduling> {
     const scheduling = await this.schedulingRepo.findOne({ where: { id } });
     if (!scheduling) throw new NotFoundException('Agendamento nao encontrado.');
-    if (scheduling.status !== SchedulingStatus.SCHEDULED) {
-      throw new BadRequestException('Apenas agendamentos com status SCHEDULED podem ser concluidos.');
+    if (
+      scheduling.status !== SchedulingStatus.SCHEDULED &&
+      scheduling.status !== SchedulingStatus.CHECKED_IN
+    ) {
+      throw new BadRequestException(
+        'Apenas agendamentos com status SCHEDULED ou CHECKED_IN podem ser concluidos.',
+      );
     }
 
     scheduling.status = SchedulingStatus.COMPLETED;
     return this.schedulingRepo.save(scheduling);
+  }
+
+  async checkIn(id: string, actor: JwtPayload): Promise<Scheduling> {
+    const scheduling = await this.schedulingRepo.findOne({
+      where: { id },
+      relations: { client: { user: true }, professional: { user: true } },
+    });
+
+    if (!scheduling) throw new NotFoundException('Agendamento nao encontrado.');
+    if (scheduling.status !== SchedulingStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'Apenas agendamentos com status SCHEDULED podem confirmar presenca.',
+      );
+    }
+
+    const professionalPhone = scheduling.professional.user.phone?.trim();
+    if (!professionalPhone) {
+      throw new BadRequestException(
+        'Profissional sem telefone cadastrado para notificacao de check-in via WhatsApp.',
+      );
+    }
+
+    const actorUser = await this.userRepo.findOne({ where: { id: actor.sub } });
+    const checkedInByName = actorUser?.name?.trim() || actor.email;
+    const receptionPhone = actorUser?.phone?.trim();
+    if (!receptionPhone) {
+      throw new BadRequestException(
+        'Usuario que confirmou o check-in nao possui telefone cadastrado para envio WhatsApp.',
+      );
+    }
+
+    scheduling.status = SchedulingStatus.CHECKED_IN;
+    const updated = await this.schedulingRepo.save(scheduling);
+
+    await this.schedulingEventsPublisher.publishCheckedIn({
+      schedulingId: updated.id,
+      clientName: updated.client.user.name,
+      professionalName: updated.professional.user.name,
+      professionalPhone,
+      checkedInByName,
+      receptionPhone,
+      startAt: updated.startAt,
+    });
+
+    return updated;
   }
 
   async reschedule(id: string, dto: RescheduleSchedulingDto): Promise<Scheduling> {

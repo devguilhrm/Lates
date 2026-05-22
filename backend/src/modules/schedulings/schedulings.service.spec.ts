@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CancellationType, DayOfWeek, UserRole } from '../../common/enums';
 import { Availability, Client, Professional, Scheduling, User } from '../../database/entities';
 import { SubscriptionBillingService } from '../billing/subscription-billing.service';
+import { InternalNotificationsService } from '../notifications/internal-notifications.service';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
 import { SchedulingsService } from './schedulings.service';
 
@@ -59,8 +60,13 @@ describe('SchedulingsService', () => {
   let clientRepo: { findOne: jest.Mock; save: jest.Mock };
   let professionalRepo: { findOne: jest.Mock };
   let userRepo: { findOne: jest.Mock };
-  let schedulingEventsPublisher: { publishCreated: jest.Mock; publishCancelled: jest.Mock };
+  let schedulingEventsPublisher: {
+    publishCreated: jest.Mock;
+    publishCancelled: jest.Mock;
+    publishCheckedIn: jest.Mock;
+  };
   let subscriptionBillingService: { getClientSubscriptionSnapshot: jest.Mock };
+  let internalNotificationsService: { notifyReceptionAboutClientScheduling: jest.Mock };
 
   beforeEach(async () => {
     schedulingRepo = {
@@ -85,9 +91,13 @@ describe('SchedulingsService', () => {
     schedulingEventsPublisher = {
       publishCreated: jest.fn(),
       publishCancelled: jest.fn(),
+      publishCheckedIn: jest.fn(),
     };
     subscriptionBillingService = {
       getClientSubscriptionSnapshot: jest.fn(),
+    };
+    internalNotificationsService = {
+      notifyReceptionAboutClientScheduling: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -105,6 +115,10 @@ describe('SchedulingsService', () => {
         {
           provide: SubscriptionBillingService,
           useValue: subscriptionBillingService,
+        },
+        {
+          provide: InternalNotificationsService,
+          useValue: internalNotificationsService,
         },
       ],
     }).compile();
@@ -266,6 +280,59 @@ describe('SchedulingsService', () => {
     expect(clientRepo.save).toHaveBeenCalledTimes(1);
     expect(client.creditsRemaining).toBe(3);
     expect(schedulingEventsPublisher.publishCreated).toHaveBeenCalledTimes(1);
+    expect(internalNotificationsService.notifyReceptionAboutClientScheduling).not.toHaveBeenCalled();
+  });
+
+  it('deve notificar recepcao quando cliente cria agendamento', async () => {
+    const { start: futureStart, end: futureEnd } = createFutureBusinessSlot();
+    const dayOfWeek = dayOfWeekFromDate(futureStart);
+    const client = {
+      id: 'client-1',
+      creditsRemaining: 4,
+      plan: 'MONTHLY',
+      user: { id: 'user-client', email: 'client@mail.com' },
+    } as unknown as Client;
+    const professional = {
+      id: 'professional-1',
+      user: { name: 'Profissional' },
+    } as Professional;
+
+    clientRepo.findOne
+      .mockResolvedValueOnce(client)
+      .mockResolvedValueOnce(client);
+    professionalRepo.findOne.mockResolvedValue(professional);
+    userRepo.findOne.mockResolvedValue({ id: 'user-client' } as User);
+    availabilityRepo.find.mockResolvedValue([
+      {
+        dayOfWeek,
+        startTime: '08:00',
+        endTime: '18:00',
+        maxConcurrentClients: 2,
+      },
+    ]);
+    schedulingRepo.createQueryBuilder
+      .mockReturnValueOnce(createCountQueryBuilder(0))
+      .mockReturnValueOnce(createConflictQueryBuilder(null));
+    subscriptionBillingService.getClientSubscriptionSnapshot.mockResolvedValue({
+      status: 'PAID',
+      isUpToDate: true,
+      cycle: 'MONTHLY',
+      billing: null,
+    });
+    schedulingRepo.create.mockImplementation((payload) => payload);
+    schedulingRepo.save.mockImplementation(async (payload) => ({ id: 'sched-2', ...payload }));
+
+    await service.create(
+      {
+        clientId: 'client-1',
+        professionalId: 'professional-1',
+        startAt: futureStart.toISOString(),
+        endAt: futureEnd.toISOString(),
+      },
+      { sub: 'user-client', email: 'client@mail.com', role: UserRole.CLIENT },
+    );
+
+    expect(internalNotificationsService.notifyReceptionAboutClientScheduling).toHaveBeenCalledTimes(1);
   });
 
   it('cliente autenticado nao pode agendar em nome de outro cliente', async () => {
@@ -315,5 +382,38 @@ describe('SchedulingsService', () => {
     expect(clientRepo.save).toHaveBeenCalledTimes(1);
     expect(scheduling.client.creditsRemaining).toBe(3);
     expect(schedulingEventsPublisher.publishCancelled).toHaveBeenCalledTimes(1);
+  });
+
+  it('deve confirmar presenca e publicar evento de check-in', async () => {
+    const scheduling = {
+      id: 'sched-2',
+      status: 'SCHEDULED',
+      client: { user: { name: 'Cliente Teste' } },
+      professional: { user: { name: 'Profissional Teste', phone: '+5511988887777' } },
+      startAt: new Date(),
+    } as unknown as Scheduling;
+
+    schedulingRepo.findOne.mockResolvedValue(scheduling);
+    schedulingRepo.save.mockImplementation(async (payload) => payload);
+    userRepo.findOne.mockResolvedValue({
+      id: 'admin-1',
+      name: 'Recepcao',
+      phone: '+5511977776666',
+    } as User);
+
+    const updated = await service.checkIn('sched-2', {
+      sub: 'admin-1',
+      email: 'admin@mail.com',
+      role: UserRole.ADMIN,
+    });
+
+    expect(updated.status).toBe('CHECKED_IN');
+    expect(schedulingEventsPublisher.publishCheckedIn).toHaveBeenCalledTimes(1);
+    expect(schedulingEventsPublisher.publishCheckedIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        professionalPhone: '+5511988887777',
+        receptionPhone: '+5511977776666',
+      }),
+    );
   });
 });

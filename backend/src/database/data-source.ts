@@ -1,12 +1,30 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { Availability, Client, ClientBilling, FinancialTransaction, Professional, Scheduling, User } from './entities';
+import {
+  Availability,
+  Client,
+  ClientBilling,
+  FinancialTransaction,
+  InternalNotification,
+  Professional,
+  Scheduling,
+  User,
+} from './entities';
 
 export default new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: false,
-  entities: [User, Client, Professional, Availability, Scheduling, FinancialTransaction, ClientBilling],
+  entities: [
+    User,
+    Client,
+    Professional,
+    Availability,
+    Scheduling,
+    FinancialTransaction,
+    ClientBilling,
+    InternalNotification,
+  ],
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
 });

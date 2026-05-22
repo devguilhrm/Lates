@@ -3,6 +3,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { KafkaProducerService } from '../../messaging/kafka-producer.service';
 import {
+  SchedulingCheckedInEvent,
   SCHEDULING_EVENTS_EXCHANGE,
   SchedulingCancelledEvent,
   SchedulingCreatedEvent,
@@ -44,6 +45,15 @@ export class SchedulingEventsPublisher {
     await this.publish(
       SchedulingEventRoutingKey.Reminder,
       SchedulingKafkaTopic.Reminder,
+      payload.schedulingId,
+      payload,
+    );
+  }
+
+  async publishCheckedIn(payload: SchedulingCheckedInEvent): Promise<void> {
+    await this.publish(
+      SchedulingEventRoutingKey.CheckedIn,
+      SchedulingKafkaTopic.CheckedIn,
       payload.schedulingId,
       payload,
     );

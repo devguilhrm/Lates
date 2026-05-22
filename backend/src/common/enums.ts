@@ -24,6 +24,7 @@ export enum DayOfWeek {
 
 export enum SchedulingStatus {
   SCHEDULED = 'SCHEDULED',
+  CHECKED_IN = 'CHECKED_IN',
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
   NO_SHOW = 'NO_SHOW',

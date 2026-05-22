@@ -70,6 +70,15 @@ export class SchedulingsController {
     return this.schedulingsService.complete(id);
   }
 
+  @Patch(':id/check-in')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Confirmar presenca manualmente no agendamento' })
+  @ApiParam({ name: 'id', description: 'UUID do agendamento' })
+  @ApiOkResponse({ description: 'Presenca confirmada com notificacao ao profissional.' })
+  checkIn(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.schedulingsService.checkIn(id, user);
+  }
+
   @Patch(':id/reschedule')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Remarcar agendamento para novo horário' })

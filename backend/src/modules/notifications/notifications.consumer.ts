@@ -8,11 +8,13 @@ import {
   SchedulingKafkaTopic,
 } from '../schedulings/events/scheduling-events';
 import type {
+  SchedulingCheckedInEvent,
   SchedulingCancelledEvent,
   SchedulingCreatedEvent,
   SchedulingReminderEvent,
 } from '../schedulings/events/scheduling-events';
 import { MailService } from './mail.service';
+import { WhatsAppService } from './whatsapp.service';
 
 @Injectable()
 export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
@@ -22,6 +24,7 @@ export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly whatsAppService: WhatsAppService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -50,6 +53,7 @@ export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
       await this.consumer.subscribe({ topic: SchedulingKafkaTopic.Created, fromBeginning: false });
       await this.consumer.subscribe({ topic: SchedulingKafkaTopic.Cancelled, fromBeginning: false });
       await this.consumer.subscribe({ topic: SchedulingKafkaTopic.Reminder, fromBeginning: false });
+      await this.consumer.subscribe({ topic: SchedulingKafkaTopic.CheckedIn, fromBeginning: false });
       await this.consumer.run({ eachMessage: (message) => this.handleKafkaMessage(message) });
       this.logger.log('Kafka notification consumer conectado.');
     } catch (error) {
@@ -90,6 +94,15 @@ export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
     await this.mailService.sendReminder(payload);
   }
 
+  @RabbitSubscribe({
+    exchange: SCHEDULING_EVENTS_EXCHANGE,
+    routingKey: SchedulingEventRoutingKey.CheckedIn,
+    queue: 'notifications.scheduling.checked-in',
+  })
+  async onSchedulingCheckedIn(payload: SchedulingCheckedInEvent): Promise<void> {
+    await this.whatsAppService.sendProfessionalCheckInNotification(payload);
+  }
+
   private async handleKafkaMessage({ topic, message }: EachMessagePayload): Promise<void> {
     if (!message.value) return;
 
@@ -107,6 +120,11 @@ export class NotificationsConsumer implements OnModuleInit, OnModuleDestroy {
 
     if (topic === SchedulingKafkaTopic.Reminder) {
       await this.onSchedulingReminder(payload as SchedulingReminderEvent);
+      return;
+    }
+
+    if (topic === SchedulingKafkaTopic.CheckedIn) {
+      await this.onSchedulingCheckedIn(payload as SchedulingCheckedInEvent);
     }
   }
 

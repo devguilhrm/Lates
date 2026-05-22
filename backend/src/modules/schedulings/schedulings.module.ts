@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Availability, Client, Professional, Scheduling, User } from '../../database/entities';
 import { BillingModule } from '../billing/billing.module';
 import { MessagingModule } from '../messaging/messaging.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SchedulingEventsPublisher } from './events/scheduling-events.publisher';
 import { SchedulingsController } from './schedulings.controller';
 import { SchedulingsService } from './schedulings.service';
@@ -12,6 +13,7 @@ import { SchedulingsService } from './schedulings.service';
     TypeOrmModule.forFeature([Scheduling, Client, Professional, Availability, User]),
     MessagingModule,
     BillingModule,
+    NotificationsModule,
   ],
   controllers: [SchedulingsController],
   providers: [SchedulingsService, SchedulingEventsPublisher],

@@ -4,7 +4,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { Availability, Client, ClientBilling, FinancialTransaction, Professional, Scheduling, User } from './database/entities';
+import {
+  Availability,
+  Client,
+  ClientBilling,
+  FinancialTransaction,
+  InternalNotification,
+  Professional,
+  Scheduling,
+  User,
+} from './database/entities';
 import { SchedulingsModule } from './modules/schedulings/schedulings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -40,7 +49,16 @@ const queueImports =
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: config.get<string>('DB_SYNC') === 'true',
-        entities: [User, Client, Professional, Availability, Scheduling, FinancialTransaction, ClientBilling],
+        entities: [
+          User,
+          Client,
+          Professional,
+          Availability,
+          Scheduling,
+          FinancialTransaction,
+          ClientBilling,
+          InternalNotification,
+        ],
       }),
     }),
     ...queueImports,

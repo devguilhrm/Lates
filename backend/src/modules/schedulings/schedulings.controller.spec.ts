@@ -10,6 +10,7 @@ describe('SchedulingsController', () => {
     findOne: jest.Mock;
     cancel: jest.Mock;
     complete: jest.Mock;
+    checkIn: jest.Mock;
     reschedule: jest.Mock;
     getAvailableSlots: jest.Mock;
   };
@@ -23,6 +24,7 @@ describe('SchedulingsController', () => {
       findOne: jest.fn(),
       cancel: jest.fn(),
       complete: jest.fn(),
+      checkIn: jest.fn(),
       reschedule: jest.fn(),
       getAvailableSlots: jest.fn(),
     };
@@ -79,6 +81,16 @@ describe('SchedulingsController', () => {
       status: 'COMPLETED',
     });
     expect(service.complete).toHaveBeenCalledWith('sch-4');
+  });
+
+  it('deve confirmar presenca de agendamento', async () => {
+    service.checkIn.mockResolvedValue({ id: 'sch-6', status: 'CHECKED_IN' });
+
+    await expect(controller.checkIn('sch-6', user)).resolves.toEqual({
+      id: 'sch-6',
+      status: 'CHECKED_IN',
+    });
+    expect(service.checkIn).toHaveBeenCalledWith('sch-6', user);
   });
 
   it('deve remarcar agendamento', async () => {

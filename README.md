@@ -312,12 +312,6 @@ Marca visual:
   - rate limit,
   - politicas de backup e restore.
 
-## Roadmap Tecnico
-
-- Cobertura E2E dos fluxos criticos.
-- Integração de gateway de pagamento.
-- Observabilidade completa (tracing, dashboards e alertas).
-- Politicas de governanca de dados (LGPD, auditoria ampliada).
 
 ## Documentacao Complementar
 

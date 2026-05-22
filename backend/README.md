@@ -16,7 +16,7 @@ API principal do LatesOS construída com NestJS.
 - `auth`: login, refresh, logout e guards de permissão.
 - `clients`: cadastro e gestão de clientes.
 - `professionals`: cadastro, especialidades e disponibilidade.
-- `schedulings`: agenda, conflitos, conclusão, cancelamento e remarcação.
+- `schedulings`: agenda, conflitos, check-in manual, conclusão, cancelamento e remarcação.
 - `finance`: lançamentos, dashboard e mensalidades recorrentes.
 - `services`: catálogo e orçamento em PDF.
 - `seeds`: seed de admin e dados fictícios.
@@ -69,6 +69,10 @@ RABBITMQ_URL=amqp://user:pass@localhost:5672
 KAFKA_BROKERS=localhost:9094
 KAFKA_CLIENT_ID=latesos-api
 KAFKA_NOTIFICATIONS_GROUP_ID=latesos-notifications
+
+# WhatsApp (check-in inteligente)
+WHATSAPP_API_URL=
+WHATSAPP_API_TOKEN=
 ```
 
 ## Executando
@@ -101,7 +105,10 @@ Swagger: `http://localhost:3000/api`
 - `POST /professionals`
 - `GET /schedulings`
 - `POST /schedulings`
+- `PATCH /schedulings/:id/check-in`
 - `PATCH /schedulings/:id/cancel`
+- `GET /notifications/inbox`
+- `PATCH /notifications/:id/read`
 - `GET /finance/dashboard`
 - `GET /finance/subscriptions`
 - `POST /finance/subscriptions/:clientId/pay`
@@ -112,6 +119,9 @@ Swagger: `http://localhost:3000/api`
 ## Regras importantes
 
 - Agenda não permite horário passado.
+- Check-in manual (`/schedulings/:id/check-in`) só pode ser feito para agendamento `SCHEDULED` por `ADMIN` ou `RECEPTIONIST`.
+- No check-in, a notificação WhatsApp é enviada ao telefone do profissional e usa como emissor o telefone do usuário logado que confirmou a presença.
+- Quando o cliente cria/confirma agendamento (ex.: app mobile), recepção/admin recebem notificação interna no web com atalho para usar o mesmo endpoint de check-in.
 - Cancelamento de agendamento exige tipo (`CLIENT_CANCELLED`, `PROFESSIONAL_CANCELLED`, `NO_SHOW`).
 - Mensalidades recorrentes geram status (`PENDING`, `OVERDUE`, `PAID`) e baixam automaticamente no pagamento.
 

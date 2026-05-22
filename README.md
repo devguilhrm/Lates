@@ -207,7 +207,7 @@ erDiagram
   - CRUD, especialidades e disponibilidade semanal.
   - Base para calculo de slots disponiveis.
 - **Agenda**
-  - Criacao, remarcacao, conclusao e cancelamento com motivo.
+  - Criacao, check-in manual de presenca, remarcacao, conclusao e cancelamento com motivo.
   - Regras para evitar conflito e horario invalido.
 - **Financeiro**
   - Entradas/saidas e dashboard de fluxo.

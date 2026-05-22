@@ -115,6 +115,7 @@ h1 {
   display: flex;
   gap: 0.55rem;
   align-items: center;
+  position: relative;
 }
 
 .menu-button,
@@ -140,6 +141,101 @@ h1 {
 
 .menu-button {
   display: none;
+}
+
+.notifications-wrapper {
+  position: relative;
+}
+
+.notification-button {
+  position: relative;
+}
+
+.notification-icon {
+  font-weight: 900;
+  line-height: 1;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: #ef4444;
+  color: #fff;
+  padding: 0 0.22rem;
+}
+
+.notifications-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  width: min(25rem, 86vw);
+  max-height: 70vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-strong);
+  padding: 0.7rem;
+  z-index: 30;
+}
+
+.notifications-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.6rem;
+}
+
+.notifications-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.notification-item {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.55rem;
+  background: var(--background);
+}
+
+.notification-item.unread {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.notification-item h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.notification-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.notification-meta {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.muted {
+  color: var(--muted);
 }
 
 .content {
@@ -203,6 +299,11 @@ h1 {
     padding: 0.9rem 1rem;
   }
 
+  .actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   h1 {
     white-space: normal;
     font-size: 0.93rem;
@@ -210,5 +311,10 @@ h1 {
 
   .content {
     padding: 1rem;
+  }
+
+  .notifications-panel {
+    right: 0;
+    width: min(22rem, 92vw);
   }
 }

@@ -3,7 +3,8 @@ import { SchedulingStatus } from '../../core/models/domain.models';
 
 const labels: Record<SchedulingStatus, string> = {
   SCHEDULED: 'Agendado',
-  COMPLETED: 'Concluído',
+  CHECKED_IN: 'Check-in',
+  COMPLETED: 'Concluido',
   CANCELLED: 'Cancelado',
   NO_SHOW: 'Falta',
 };
@@ -23,10 +24,12 @@ const labels: Record<SchedulingStatus, string> = {
       font-weight: 700;
     }
     .SCHEDULED { color: #0369a1; background: #e0f2fe; }
+    .CHECKED_IN { color: #4338ca; background: #e0e7ff; }
     .COMPLETED { color: #047857; background: #d1fae5; }
     .CANCELLED { color: #b91c1c; background: #fee2e2; }
     .NO_SHOW { color: #b45309; background: #fef3c7; }
     :host-context([data-theme='dark']) .SCHEDULED { color: #7dd3fc; background: #0c4a6e; }
+    :host-context([data-theme='dark']) .CHECKED_IN { color: #c7d2fe; background: #312e81; }
     :host-context([data-theme='dark']) .COMPLETED { color: #86efac; background: #14532d; }
     :host-context([data-theme='dark']) .CANCELLED { color: #fca5a5; background: #7f1d1d; }
     :host-context([data-theme='dark']) .NO_SHOW { color: #fcd34d; background: #713f12; }

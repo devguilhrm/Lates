@@ -1,6 +1,6 @@
 export type UserRole = 'ADMIN' | 'RECEPTIONIST' | 'PROFESSIONAL' | 'CLIENT';
 export type PlanType = 'MONTHLY' | 'ANNUAL' | 'QUARTERLY' | 'CREDIT_PACK';
-export type SchedulingStatus = 'SCHEDULED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+export type SchedulingStatus = 'SCHEDULED' | 'CHECKED_IN' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 export type CancellationType = 'CLIENT_CANCELLED' | 'PROFESSIONAL_CANCELLED' | 'NO_SHOW';
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 export type FinancialTransactionType = 'INCOME' | 'EXPENSE';
@@ -154,4 +154,20 @@ export interface ServiceQuote {
   items: ServiceQuoteItem[];
   total: number;
   pdfUrl: string;
+}
+
+export interface InternalNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string | null;
+  schedulingId?: string | null;
+}
+
+export interface InternalNotificationInbox {
+  unreadCount: number;
+  items: InternalNotification[];
 }

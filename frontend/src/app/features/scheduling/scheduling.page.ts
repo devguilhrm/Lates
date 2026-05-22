@@ -123,7 +123,8 @@ interface DurationOption {
                   <td><app-status-badge [status]="item.status" /></td>
                   <td class="toolbar">
                     <button class="secondary-button" type="button" (click)="startReschedule(item)" [disabled]="item.status !== 'SCHEDULED'">Remarcar</button>
-                    <button class="secondary-button" type="button" (click)="complete(item.id)" [disabled]="item.status !== 'SCHEDULED'">Concluir</button>
+                    <button class="secondary-button" type="button" (click)="checkIn(item.id)" [disabled]="item.status !== 'SCHEDULED'">Confirmar presenca</button>
+                    <button class="secondary-button" type="button" (click)="complete(item.id)" [disabled]="!canComplete(item)">Concluir</button>
                     <button class="danger-button" type="button" (click)="cancel(item.id)" [disabled]="item.status !== 'SCHEDULED'">Cancelar</button>
                   </td>
                 </tr>
@@ -374,6 +375,10 @@ export class SchedulingPage {
     this.api.patch<Scheduling>(`/schedulings/${id}/complete`, {}).subscribe(() => this.loadSchedulings());
   }
 
+  protected checkIn(id: string): void {
+    this.api.patch<Scheduling>(`/schedulings/${id}/check-in`, {}).subscribe(() => this.loadSchedulings());
+  }
+
   protected cancel(id: string): void {
     const option = prompt(
       'Informe o motivo: 1 = Cliente desmarcou, 2 = Profissional desmarcou, 3 = Cliente nao compareceu',
@@ -407,6 +412,10 @@ export class SchedulingPage {
 
   protected todayDate(): string {
     return this.toDateInput(new Date());
+  }
+
+  protected canComplete(item: Scheduling): boolean {
+    return item.status === 'SCHEDULED' || item.status === 'CHECKED_IN';
   }
 
   private loadSchedulings(): void {

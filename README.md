@@ -6,6 +6,10 @@
 
 <p align="center">
   Plataforma de gestao operacional para clinicas de Pilates e Fisioterapia.
+  
+</p>
+<p align="center">
+  Página institucional: https://latesos.netlify.app
 </p>
 
 <p align="center">
